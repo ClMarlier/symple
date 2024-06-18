@@ -54,7 +54,7 @@ func WithHS256(ajc *authJwtConfig) error {
 	return nil
 }
 
-func SubFromToken(tokenString string, secret string, methods []string) (int, error) {
+func subFromToken(tokenString string, secret string, methods []string) (int, error) {
 	if tokenString == "" {
 		return 0, nil
 	}
@@ -102,7 +102,7 @@ func (ac *authJwtConfig) authJWT(next http.Handler) http.Handler {
 			http.Error(w, "The Authorization Header should be a Bearer", http.StatusUnauthorized)
 			return
 		}
-		sub, err := SubFromToken(splitedTokenString[1], ac.secret, ac.methods)
+		sub, err := subFromToken(splitedTokenString[1], ac.secret, ac.methods)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return

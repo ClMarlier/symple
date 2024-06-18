@@ -38,6 +38,7 @@ type routeDefinition struct {
 //   - WithRouter()
 //   - WithAuthJWT()
 //   - WithStructLogger()
+//   - WithRecoverer
 func Router(opts ...muxOption) *http.ServeMux {
 	return routerWithPrefix("", opts...)
 }

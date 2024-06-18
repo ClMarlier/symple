@@ -48,7 +48,7 @@ func (lg *LoggerConfig) sLogger(next http.Handler) http.Handler {
 			}
 		}
 
-		error, ok := r.Context().Value("error").(error)
+		error, ok := r.Context().Value("symple_error").(error)
 		if !ok {
 			lg.Log.Info(
 				"",
