@@ -28,7 +28,7 @@ type routeDefinition struct {
 }
 
 // Router is the entrypoint to build the http.ServeMux. Be careful Router is
-// intended to be the root router, if you want nested router use WithRouter
+// intended to be at the root, if you want nested router use WithRouter instead
 //
 // Available muxOption:
 //
@@ -36,8 +36,12 @@ type routeDefinition struct {
 //   - WithPrefix()
 //   - WithRoute()
 //   - WithRouter()
+//
+// Available middleware:
+//
 //   - WithAuthJWT()
 //   - WithStructLogger()
+//   - WithMiddleware()
 //   - WithRecoverer
 func Router(opts ...muxOption) *http.ServeMux {
 	return routerWithPrefix("", opts...)
@@ -89,9 +93,13 @@ func routerWithPrefix(prefix string, opts ...muxOption) *http.ServeMux {
 	// Wrap this router with the middleware stack
 	router.Handle("/", stack(rb.router))
 
+	// Add some fun
+	beforeStart()
+
 	return router
 }
 
+// WithRouter adds a subrouter to the current router
 func WithRouter(opts ...muxOption) muxOption {
 	return func(rb *routerBuilder) error {
 		router := routerWithPrefix(rb.prefix, opts...)
@@ -101,6 +109,8 @@ func WithRouter(opts ...muxOption) muxOption {
 	}
 }
 
+// WithPrefix set the prefix path for the current router. Keep in mind that
+// the current router also inherit from all it's parents prefixes
 func WithPrefix(prefix string) muxOption {
 	return func(rb *routerBuilder) error {
 		rb.prefix = fmt.Sprintf("%s%s", rb.prefix, prefix)
@@ -117,36 +127,7 @@ func WithPrefix(prefix string) muxOption {
 	}
 }
 
-// WithOption is adding if set to true a handler for OPTION method for every child
-// route created. You can deactivate this behaviour in child SubRouter by
-// setting it to false
-func WithOption(active bool) muxOption {
-	return func(rb *routerBuilder) error {
-		rb.option = active
-		return nil
-	}
-}
-
-func applyPrefix(pattern string, prefix string) string {
-	if prefix == "" {
-		return pattern
-	}
-	splited := strings.Split(pattern, " ")
-	newPath := ""
-	if len(splited) == 1 {
-		newPath = fmt.Sprintf("%s%s", prefix, splited[0])
-	} else {
-		newPath = fmt.Sprintf("%s %s%s", splited[0], prefix, splited[1])
-	}
-	return newPath
-}
-
-func optionHandler(methods []string) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Add("Accept", strings.Join(methods, ", "))
-	}
-}
-
+// WithRoute adds a new route to the current router
 func WithRoute(pattern string, handler http.HandlerFunc) muxOption {
 	return func(rb *routerBuilder) error {
 		rb.routeStack = append(
@@ -181,7 +162,37 @@ func WithRoute(pattern string, handler http.HandlerFunc) muxOption {
 	}
 }
 
-func BeforeStart() {
+// WithOption is adding if set to true a handler for OPTION method for every child
+// route created. You can deactivate this behaviour in child SubRouter by
+// setting it to false
+func WithOption(active bool) muxOption {
+	return func(rb *routerBuilder) error {
+		rb.option = active
+		return nil
+	}
+}
+
+func optionHandler(methods []string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Accept", strings.Join(methods, ", "))
+	}
+}
+
+func applyPrefix(pattern string, prefix string) string {
+	if prefix == "" {
+		return pattern
+	}
+	splited := strings.Split(pattern, " ")
+	newPath := ""
+	if len(splited) == 1 {
+		newPath = fmt.Sprintf("%s%s", prefix, splited[0])
+	} else {
+		newPath = fmt.Sprintf("%s %s%s", splited[0], prefix, splited[1])
+	}
+	return newPath
+}
+
+func beforeStart() {
 	fmt.Println("")
 	fmt.Println("\033[0;30m\033[102m  ____                            _        \033[0m")
 	fmt.Println("\033[0;30m\033[102m / ___|  _   _  _ __ ___   _ __  | |  ___  \033[0m")

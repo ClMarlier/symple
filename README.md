@@ -1,0 +1,2 @@
+- extraire le trackingWriter du logger
+- voir pour le cache
