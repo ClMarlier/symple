@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 	"regexp"
 	"slices"
 	"strings"
@@ -44,6 +43,8 @@ type routeDefinition struct {
 //   - WithMiddleware()
 //   - WithRecoverer
 func Router(opts ...muxOption) *http.ServeMux {
+	beforeStart()
+
 	return routerWithPrefix("", opts...)
 }
 
@@ -57,10 +58,6 @@ func routerWithPrefix(prefix string, opts ...muxOption) *http.ServeMux {
 		option:          false,
 	}
 
-	f, err := os.OpenFile("openapi.json", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
 	// Load options into routerBuilder struct
 	for _, option := range opts {
 		if err := option(rb); err != nil {
@@ -78,23 +75,20 @@ func routerWithPrefix(prefix string, opts ...muxOption) *http.ServeMux {
 
 	// Append the routes to this router
 	for _, route := range rb.routeStack {
-		f.Write([]byte(applyPrefix(route.pattern, rb.prefix) + "\n"))
+		fmt.Println(applyPrefix(route.pattern, rb.prefix))
 		rb.router.HandleFunc(applyPrefix(route.pattern, rb.prefix), route.handler)
 	}
 
 	// If activated add a handler for each route with method OPTION
-	if rb.option == true {
+	if rb.option {
 		for path, methods := range rb.routeMap {
-			fmt.Println(fmt.Sprintf("%s: %s", path, methods))
+			fmt.Printf("%s: %s\n", path, methods)
 			router.HandleFunc(fmt.Sprintf("%s %s", "OPTIONS", path), optionHandler(methods))
 		}
 	}
 
 	// Wrap this router with the middleware stack
 	router.Handle("/", stack(rb.router))
-
-	// Add some fun
-	beforeStart()
 
 	return router
 }

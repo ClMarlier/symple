@@ -6,6 +6,7 @@ import (
 	"runtime"
 )
 
+// WithRecoverer handle gracefully any panic that could occur
 func WithRecoverer(rb *routerBuilder) error {
 	rb.middlewareStack = append(rb.middlewareStack, recoverer)
 	return nil

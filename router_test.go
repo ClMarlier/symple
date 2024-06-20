@@ -5,17 +5,25 @@ import (
 )
 
 func TestPrefixPath(t *testing.T) {
-	values := []map[string]string{}
-	v1 := map[string]string{"input1": "", "input2": "GET /hello", "expected": "GET /hello"}
-	v2 := map[string]string{"input1": "", "input2": "/hello", "expected": "/hello"}
-	v3 := map[string]string{"input1": "/prefix", "input2": "GET /hello", "expected": "GET /prefix/hello"}
-	v4 := map[string]string{"input1": "/prefix", "input2": "/hello", "expected": "/prefix/hello"}
-	values = append(values, v1, v2, v3, v4)
+	values := []struct {
+		name          string
+		path          string
+		prefix        string
+		expectedValue string
+	}{
+		{name: "empty prefix with method", path: "GET /hello", prefix: "", expectedValue: "GET /hello"},
+		{name: "empty prefix without method", path: "/hello", prefix: "", expectedValue: "/hello"},
+		{name: "with prefix with method", path: "GET /hello", prefix: "/prefix", expectedValue: "GET /prefix/hello"},
+		{name: "with prefix without method", path: "/hello", prefix: "/prefix", expectedValue: "/prefix/hello"},
+	}
 
-	for _, v := range values {
-		res := applyPrefix(v["input2"], v["input1"])
-		if res != v["expected"] {
-			t.Fatalf("Invalid path values: %s, expected %s", res, v["expected"])
-		}
+	for _, val := range values {
+		t.Run(val.name, func(t *testing.T) {
+			res := applyPrefix(val.path, val.prefix)
+			if res != val.expectedValue {
+				t.Fatalf("Invalid path values: %s, expected %s", res, val.expectedValue)
+			}
+		})
+
 	}
 }

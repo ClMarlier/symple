@@ -1,6 +1,7 @@
 package symple
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -25,7 +26,9 @@ type LoggerConfig struct {
 func (lg *LoggerConfig) sLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		user := r.Context().Value("user")
+		ctx := context.WithValue(r.Context(), tokenSub{}, 12)
+		r = r.WithContext(ctx)
+		user := r.Context().Value(tokenSub{})
 
 		next.ServeHTTP(w, r)
 

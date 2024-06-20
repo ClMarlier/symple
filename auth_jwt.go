@@ -10,6 +10,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+type tokenSub struct{}
+
 type authJwtConfig struct {
 	secret  string
 	methods []string
@@ -17,8 +19,8 @@ type authJwtConfig struct {
 
 type authJwtOption func(*authJwtConfig) error
 
-// WithAuthJWT add a middleware that restrict the access to the route define in
-// the current router and all the child subrouters.
+// WithAuthJWT add restricts the access to the current router and all childs
+// subrouters with a valid JWT token
 func WithAuthJWT(opts ...authJwtOption) muxOption {
 	return func(rb *routerBuilder) error {
 		config := &authJwtConfig{
@@ -32,10 +34,10 @@ func WithAuthJWT(opts ...authJwtOption) muxOption {
 			}
 		}
 		if len(config.methods) == 0 {
-			return fmt.Errorf("Using AuthJWT with no signing method is not allowed")
+			return fmt.Errorf("using AuthJWT with no signing method is not allowed")
 		}
 		if config.secret == "" {
-			return fmt.Errorf("Using AuthJWT with no secret is not allowed")
+			return fmt.Errorf("using AuthJWT with no secret is not allowed")
 		}
 		rb.middlewareStack = append(rb.middlewareStack, config.authJWT)
 		return nil
@@ -61,7 +63,7 @@ func subFromToken(tokenString string, secret string, methods []string) (int, err
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return 0, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			return 0, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(secret), nil
 	}, jwt.WithValidMethods(methods),
@@ -107,7 +109,7 @@ func (ac *authJwtConfig) authJWT(next http.Handler) http.Handler {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
 		} else if sub != 0 {
-			ctx := context.WithValue(r.Context(), "user", sub)
+			ctx := context.WithValue(r.Context(), tokenSub{}, sub)
 			r = r.WithContext(ctx)
 		}
 		next.ServeHTTP(w, r)

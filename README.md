@@ -1,2 +1,2 @@
-- extraire le trackingWriter du logger
+- reflechir a éviter que le recoverer ne renvoi le contenu au client (probablement mettre un recovererConfig avec un boolean on/off error details)
 - voir pour le cache
