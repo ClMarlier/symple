@@ -23,14 +23,14 @@ type LoggerConfig struct {
 	Log *slog.Logger
 }
 
-func (lg *LoggerConfig) sLogger(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		ctx := context.WithValue(r.Context(), tokenSub{}, 12)
 		r = r.WithContext(ctx)
 		user := r.Context().Value(tokenSub{})
 
-		next.ServeHTTP(w, r)
+		next(w, r)
 
 		var body map[string]interface{}
 		if r.Header.Get("Content-Type") == "application/json" {
@@ -65,5 +65,5 @@ func (lg *LoggerConfig) sLogger(next http.Handler) http.Handler {
 				)
 			}
 		}
-	})
+	}
 }

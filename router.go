@@ -2,7 +2,6 @@ package symple
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"regexp"
 	"slices"
@@ -10,20 +9,19 @@ import (
 )
 
 type routerBuilder struct {
-	router          *http.ServeMux
 	prefix          string
 	middlewareStack []Middleware
 	routeStack      []routeDefinition
-	subRouter       []*http.ServeMux
-	routeMap        map[string][]string
+	subRouter       []routerBuilder
 	option          bool
 }
 
 type muxOption func(*routerBuilder) error
 
 type routeDefinition struct {
-	pattern string
-	handler http.HandlerFunc
+	pattern         string
+	handler         http.HandlerFunc
+	middlewareStack []Middleware
 }
 
 // Router is the entrypoint to build the http.ServeMux. Be careful Router is
@@ -42,61 +40,93 @@ type routeDefinition struct {
 //   - WithStructLogger()
 //   - WithMiddleware()
 //   - WithRecoverer
-func Router(opts ...muxOption) *http.ServeMux {
+func Router(opts ...muxOption) (*http.ServeMux, error) {
+	router, err := initRouter(opts...)
+	if err != nil {
+		return nil, err
+	}
+	mux := http.NewServeMux()
+	for _, route := range router.routeStack {
+		mux.HandleFunc(route.pattern, chainMiddleware(route.handler, route.middlewareStack...))
+	}
 	beforeStart()
-
-	return routerWithPrefix("", opts...)
+	return mux, nil
 }
 
-func routerWithPrefix(prefix string, opts ...muxOption) *http.ServeMux {
-	rb := &routerBuilder{
-		router:          http.NewServeMux(),
-		prefix:          prefix,
+func initRouter(opts ...muxOption) (routerBuilder, error) {
+	rb := routerBuilder{
+		prefix:          "",
 		middlewareStack: []Middleware{},
-		subRouter:       []*http.ServeMux{},
-		routeMap:        map[string][]string{},
+		routeStack:      []routeDefinition{},
+		subRouter:       []routerBuilder{},
 		option:          false,
 	}
 
-	// Load options into routerBuilder struct
-	for _, option := range opts {
-		if err := option(rb); err != nil {
-			log.Fatal(err.Error())
+	// Load options
+	for _, opt := range opts {
+		if err := opt(&rb); err != nil {
+			return routerBuilder{}, err
 		}
 	}
 
-	router := http.NewServeMux()
-	stack := createStack(rb.middlewareStack...)
-
-	// Load and append all the subrouters routes to this router
-	for _, rh := range rb.subRouter {
-		rb.router.Handle("/", rh)
-	}
-
-	// Append the routes to this router
+	// add routes for HTTP OPTION method
+	routeMethods := map[string][]string{}
 	for _, route := range rb.routeStack {
-		fmt.Println(applyPrefix(route.pattern, rb.prefix))
-		rb.router.HandleFunc(applyPrefix(route.pattern, rb.prefix), route.handler)
-	}
+		splitted := strings.Split(route.pattern, " ")
+		if len(splitted) == 1 {
+			routeMethods[applyPrefix(route.pattern, rb.prefix)] = []string{
+				"GET",
+				"HEAD",
+				"POST",
+				"PUT",
+				"DELETE",
+				"CONNECT",
+				"OPTIONS",
+				"TRACE",
+				"PATCH"}
+			continue
+		}
 
-	// If activated add a handler for each route with method OPTION
-	if rb.option {
-		for path, methods := range rb.routeMap {
-			fmt.Printf("%s: %s\n", path, methods)
-			router.HandleFunc(fmt.Sprintf("%s %s", "OPTIONS", path), optionHandler(methods))
+		if len(splitted) == 2 {
+			method := splitted[0]
+			path := applyPrefix(splitted[1], rb.prefix)
+			if _, ok := routeMethods[path]; !ok {
+				routeMethods[path] = []string{method}
+			} else if !slices.Contains(routeMethods[path], method) {
+				routeMethods[path] = append(routeMethods[path], method)
+			}
 		}
 	}
+	for path, methods := range routeMethods {
+		rb.routeStack = append(rb.routeStack, routeDefinition{
+			pattern:         fmt.Sprintf("OPTION %s", path),
+			handler:         optionHandler(methods),
+			middlewareStack: []Middleware{},
+		})
+	}
 
-	// Wrap this router with the middleware stack
-	router.Handle("/", stack(rb.router))
+	// add subrouters route to routeStack
+	for _, subRouter := range rb.subRouter {
+		rb.routeStack = append(rb.routeStack, subRouter.routeStack...)
+	}
 
-	return router
+	// add middlewares
+	for i := range rb.routeStack {
+		fmt.Println(rb.routeStack[i].pattern)
+		rb.routeStack[i].pattern = applyPrefix(rb.routeStack[i].pattern, rb.prefix)
+		rb.routeStack[i].middlewareStack = append(rb.middlewareStack, rb.routeStack[i].middlewareStack...)
+	}
+
+	return rb, nil
 }
 
 // WithRouter adds a subrouter to the current router
 func WithRouter(opts ...muxOption) muxOption {
 	return func(rb *routerBuilder) error {
-		router := routerWithPrefix(rb.prefix, opts...)
+		router, err := initRouter(opts...)
+		if err != nil {
+			return err
+		}
 		rb.subRouter = append(rb.subRouter, router)
 
 		return nil
@@ -127,31 +157,11 @@ func WithRoute(pattern string, handler http.HandlerFunc) muxOption {
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
-				pattern: pattern,
-				handler: handler},
+				pattern:         pattern,
+				handler:         handler,
+				middlewareStack: []Middleware{},
+			},
 		)
-
-		if len(strings.Split(pattern, " ")) == 1 {
-			rb.routeMap[applyPrefix(pattern, rb.prefix)] = []string{"GET",
-				"HEAD",
-				"POST",
-				"PUT",
-				"DELETE",
-				"CONNECT",
-				"OPTIONS",
-				"TRACE",
-				"PATCH"}
-			return nil
-		}
-		splittedPath := strings.Split(pattern, " ")
-		method := splittedPath[0]
-		path := applyPrefix(splittedPath[1], rb.prefix)
-
-		if _, ok := rb.routeMap[path]; !ok {
-			rb.routeMap[path] = []string{method}
-		} else if !slices.Contains(rb.routeMap[path], method) {
-			rb.routeMap[path] = append(rb.routeMap[path], method)
-		}
 		return nil
 	}
 }

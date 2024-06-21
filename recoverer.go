@@ -12,8 +12,8 @@ func WithRecoverer(rb *routerBuilder) error {
 	return nil
 }
 
-func recoverer(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func recoverer(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		defer func() {
 			if err := recover(); err != nil {
 				error := fmt.Errorf("%+v", err)
@@ -29,6 +29,6 @@ func recoverer(next http.Handler) http.Handler {
 				Error(w, error, http.StatusInternalServerError)
 			}
 		}()
-		next.ServeHTTP(w, r)
-	})
+		next(w, r)
+	}
 }

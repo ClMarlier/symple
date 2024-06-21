@@ -4,18 +4,17 @@ import (
 	"net/http"
 )
 
-type Middleware func(http.Handler) http.Handler
+type Middleware func(http.HandlerFunc) http.HandlerFunc
 
-func createStack(middlewareStack ...Middleware) Middleware {
-	return func(next http.Handler) http.Handler {
-		for i := len(middlewareStack) - 1; i >= 0; i-- {
-			fn := middlewareStack[i]
-			next = fn(next)
-		}
-		next = baseMiddleware(next)
-
-		return next
+func chainMiddleware(h http.HandlerFunc, middlewareStack ...Middleware) http.HandlerFunc {
+	if len(middlewareStack) == 0 {
+		return h
 	}
+	for i := len(middlewareStack) - 1; i >= 0; i-- {
+		h = middlewareStack[i](h)
+	}
+	h = baseMiddleware(h)
+	return h
 }
 
 // WithMiddleware is used to add a custom middleware to the current Router
@@ -26,9 +25,9 @@ func WithMiddleware(middleware Middleware) muxOption {
 	}
 }
 
-func baseMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func baseMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		tw := &trackWriter{w, http.StatusOK, nil}
-		next.ServeHTTP(tw, r)
-	})
+		next(tw, r)
+	}
 }

@@ -88,8 +88,8 @@ func subFromToken(tokenString string, secret string, methods []string) (int, err
 	}
 }
 
-func (ac *authJwtConfig) authJWT(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
 		if len(tokenString) == 0 {
 			http.Error(w, "Missing Authorization Header", http.StatusUnauthorized)
@@ -112,6 +112,6 @@ func (ac *authJwtConfig) authJWT(next http.Handler) http.Handler {
 			ctx := context.WithValue(r.Context(), tokenSub{}, sub)
 			r = r.WithContext(ctx)
 		}
-		next.ServeHTTP(w, r)
-	})
+		next(w, r)
+	}
 }
