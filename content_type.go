@@ -67,7 +67,7 @@ func (ctc *contentTypeConfig) contentType(next http.HandlerFunc) http.HandlerFun
 				ErrorResponse(
 					w,
 					fmt.Errorf(
-						"Invalid Content-Type, found %s, wanted %s",
+						"invalid Content-Type, found %s, wanted %s",
 						contentType,
 						strings.Join(ctc.types, ", ")),
 					http.StatusUnsupportedMediaType)
