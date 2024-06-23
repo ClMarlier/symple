@@ -19,8 +19,8 @@ type authJwtConfig struct {
 
 type authJwtOption func(*authJwtConfig) error
 
-// WithAuthJWT add restricts the access to the current router and all childs
-// subrouters with a valid JWT token
+// WithAuthJWT add restricts the access to the current router and all it's
+// children subrouters with a valid JWT token
 func WithAuthJWT(opts ...authJwtOption) muxOption {
 	return func(rb *routerBuilder) error {
 		config := &authJwtConfig{

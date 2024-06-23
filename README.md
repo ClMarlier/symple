@@ -1,7 +1,6 @@
 ### Symple
 **work in progress**
 
-
 ```go
 package main
 

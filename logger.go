@@ -32,17 +32,10 @@ func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 
 		next(w, r)
 
-		var body map[string]interface{}
-		if r.Header.Get("Content-Type") == "application/json" {
-			data, err := io.ReadAll(r.Body)
-			if err == nil {
-				json.Unmarshal(data, &body)
-			}
-		}
-
 		tracker, ok := w.(*trackWriter)
 		if ok {
-			if tracker.error == nil {
+			if tracker.error == nil && lg.Log.Enabled(r.Context(), slog.LevelInfo) {
+				body := getRequestBody(r)
 				lg.Log.Info(
 					"",
 					"status", tracker.statusCode,
@@ -52,7 +45,8 @@ func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 					"user", user,
 					"time", time.Since(start).String(),
 				)
-			} else {
+			} else if tracker.error != nil {
+				body := getRequestBody(r)
 				lg.Log.Error(
 					"",
 					"status", tracker.statusCode,
@@ -66,4 +60,37 @@ func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 			}
 		}
 	}
+}
+
+func getRequestBody(r *http.Request) map[string]interface{} {
+	body := make(map[string]interface{})
+	contentType := getContentType(r)
+	switch contentType {
+	case "application/json":
+		data, err := io.ReadAll(r.Body)
+		if err == nil {
+			json.Unmarshal(data, &body)
+		}
+		return body
+	case "multipart/form-data":
+		if err := r.ParseMultipartForm(32 << 20); err == nil {
+			for key, values := range r.MultipartForm.Value {
+				if len(values) > 0 {
+					body[key] = values
+				}
+			}
+		}
+		return body
+	case "application/x-www-form-urlencoded":
+		if err := r.ParseForm(); err == nil {
+			for key, values := range r.Form {
+				if len(values) > 0 {
+					body[key] = values
+				}
+			}
+		}
+		return body
+	}
+	return body
+
 }

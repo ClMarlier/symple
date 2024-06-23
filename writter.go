@@ -15,7 +15,7 @@ func (tr *trackWriter) WriteHeader(statusCode int) {
 
 // Error is used to build the http error response with the provided http status
 // code and make theese values available to the middlewares.
-func Error(w http.ResponseWriter, error error, statusCode int) {
+func ErrorResponse(w http.ResponseWriter, error error, statusCode int) {
 	http.Error(w, error.Error(), statusCode)
 	if writter, ok := w.(*trackWriter); ok {
 		writter.error = error

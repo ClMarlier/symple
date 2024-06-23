@@ -26,7 +26,7 @@ func recoverer(next http.HandlerFunc) http.HandlerFunc {
 				for frame, more := frames.Next(); more; frame, more = frames.Next() {
 					error = fmt.Errorf("%s\n%v", frame.Function, error)
 				}
-				Error(w, error, http.StatusInternalServerError)
+				ErrorResponse(w, error, http.StatusInternalServerError)
 			}
 		}()
 		next(w, r)
