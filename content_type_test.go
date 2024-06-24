@@ -2,7 +2,6 @@ package symple
 
 import (
 	"bytes"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,74 +9,115 @@ import (
 
 func TestWithContentType(t *testing.T) {
 	testTable := []struct {
-		name          string
-		contentType   string
-		expectedValue int
+		name            string
+		contentType     string
+		withContentType routerOption
+		expectedValue   int
+		error           string
 	}{
 		{
-			name:          "matching content type no charset",
-			contentType:   "application/json",
-			expectedValue: http.StatusOK,
+			name:            "matching content type without charset",
+			contentType:     "application/json",
+			withContentType: WithContentType(WithApplicationJSON),
+			expectedValue:   http.StatusOK,
+			error:           "",
 		},
 		{
-			name:          "matching content with charset",
-			contentType:   "application/json; charset=UTF-8",
-			expectedValue: http.StatusOK,
+			name:            "matching content with charset",
+			contentType:     "application/json; charset=UTF-8",
+			withContentType: WithContentType(WithApplicationJSON),
+			expectedValue:   http.StatusOK,
+			error:           "",
 		},
 		{
-			name:          "wrong content type no charset",
-			contentType:   "application/xml",
-			expectedValue: http.StatusUnsupportedMediaType,
+			name:            "matching content with multiple content type accepted",
+			contentType:     "application/json; charset=UTF-8",
+			withContentType: WithContentType(WithApplicationXML, WithApplicationJSON),
+			expectedValue:   http.StatusOK,
+			error:           "",
 		},
 		{
-			name:          "wrong content with charset",
-			contentType:   "application/xml; charset=UTF-8",
-			expectedValue: http.StatusUnsupportedMediaType,
+			name:            "wrong content type",
+			contentType:     "xxx",
+			withContentType: WithContentType(WithApplicationJSON),
+			expectedValue:   http.StatusUnsupportedMediaType,
+			error:           "",
+		},
+		{
+			name:            "matching content application/xml",
+			contentType:     "application/xml",
+			withContentType: WithContentType(WithApplicationXML),
+			expectedValue:   http.StatusOK,
+			error:           "",
+		},
+		{
+			name:            "matching content application/x-www-form-urlencoded",
+			contentType:     "application/x-www-form-urlencoded",
+			withContentType: WithContentType(WithFormEncoded),
+			expectedValue:   http.StatusOK,
+			error:           "",
+		},
+		{
+			name:            "matching content multipart/form-data",
+			contentType:     "multipart/form-data",
+			withContentType: WithContentType(WithFormData),
+			expectedValue:   http.StatusOK,
+			error:           "",
+		},
+		{
+			name:            "double content application/json error",
+			contentType:     "application/json",
+			withContentType: WithContentType(WithApplicationJSON, WithApplicationJSON),
+			expectedValue:   http.StatusOK,
+			error:           "duplicate Content-Type",
+		},
+
+		{
+			name:            "double content application/xml error",
+			contentType:     "application/xml",
+			withContentType: WithContentType(WithApplicationXML, WithApplicationXML),
+			expectedValue:   http.StatusOK,
+			error:           "duplicate Content-Type",
+		},
+		{
+			name:            "double content application/x-www-form-urlencoded error",
+			contentType:     "application/x-www-form-urlencoded",
+			withContentType: WithContentType(WithFormEncoded, WithFormEncoded),
+			expectedValue:   http.StatusOK,
+			error:           "duplicate Content-Type",
+		},
+		{
+			name:            "double content multipart/form-data error",
+			contentType:     "multipart/form-data",
+			withContentType: WithContentType(WithFormData, WithFormData),
+			expectedValue:   http.StatusOK,
+			error:           "duplicate Content-Type",
 		},
 	}
-	mux1, err := Router(
-		WithContentType(WithApplicationJSON),
-		WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
-	)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-	mux2, err := Router(
-		WithContentType(WithApplicationJSON, WithFormData),
-		WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
-	)
-	if err != nil {
-		t.Fatalf(err.Error())
-	}
-
-	muxTable := []struct {
-		name string
-		mux  *http.ServeMux
-	}{
-		{
-			name: "single Content-Type allowed",
-			mux:  mux1,
-		},
-		{
-			name: "multiple Content-Type allowed",
-			mux:  mux2,
-		},
-	}
-
-	for _, router := range muxTable {
-		for _, val := range testTable {
-			t.Run(fmt.Sprintf("%s %s", router.name, val.name), func(t *testing.T) {
-				recorder := httptest.NewRecorder()
-				req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte("body")))
-				req.Header.Set("Content-Type", val.contentType)
-				router.mux.ServeHTTP(recorder, req)
-
-				res := recorder.Result()
-
-				if res.StatusCode != val.expectedValue {
-					t.Fatalf("Invalid status values: %d, expected %d", res.StatusCode, val.expectedValue)
+	for _, val := range testTable {
+		t.Run(val.name, func(t *testing.T) {
+			mux, err := Router(
+				val.withContentType,
+				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+			)
+			if err != nil {
+				if err.Error() == val.error {
+					return
 				}
-			})
-		}
+				t.Fatalf(err.Error())
+			}
+
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte("body")))
+			req.Header.Set("Content-Type", val.contentType)
+			mux.ServeHTTP(recorder, req)
+
+			res := recorder.Result()
+
+			if res.StatusCode != val.expectedValue {
+				t.Fatalf("Invalid status values: %d, expected %d", res.StatusCode, val.expectedValue)
+			}
+		})
 	}
+
 }

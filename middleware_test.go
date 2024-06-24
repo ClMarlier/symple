@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func middlewareWithId(id string) Middleware {
+func writeIdMiddleware(id string) Middleware {
 	return func(next http.HandlerFunc) http.HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) {
 			w.Write([]byte(id))
@@ -42,17 +42,17 @@ func TestChainMiddleware(t *testing.T) {
 
 	dummyHandler := func(w http.ResponseWriter, r *http.Request) {}
 	mux, err := Router(
-		WithMiddleware(middlewareWithId("1")),
-		WithMiddleware(middlewareWithId("2")),
+		WithMiddleware(writeIdMiddleware("1")),
+		WithMiddleware(writeIdMiddleware("2")),
 		WithRoute("POST /test", dummyHandler),
 		WithRouter(
-			WithMiddleware(middlewareWithId("3")),
-			WithMiddleware(middlewareWithId("4")),
+			WithMiddleware(writeIdMiddleware("3")),
+			WithMiddleware(writeIdMiddleware("4")),
 			WithRoute("POST /nested_test1", dummyHandler),
 		),
 		WithRouter(
-			WithMiddleware(middlewareWithId("5")),
-			WithMiddleware(middlewareWithId("6")),
+			WithMiddleware(writeIdMiddleware("5")),
+			WithMiddleware(writeIdMiddleware("6")),
 			WithRoute("POST /nested_test2", dummyHandler),
 		),
 	)

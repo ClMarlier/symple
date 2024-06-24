@@ -1,0 +1,4 @@
+- Voir pour separer en package le code, ie: middleware
+- Ajouter des recettes: 404Handler
+- Remove the jwt dependacy 
+- Rework le option handler qui est une option non utilisé et toujour active

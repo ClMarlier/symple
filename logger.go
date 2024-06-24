@@ -1,7 +1,6 @@
 package symple
 
 import (
-	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -9,7 +8,7 @@ import (
 	"time"
 )
 
-func WithStructLogger(sl slog.Handler) muxOption {
+func WithStructLogger(sl slog.Handler) routerOption {
 	return func(rb *routerBuilder) error {
 		config := &LoggerConfig{
 			Log: slog.New(sl),
@@ -26,8 +25,6 @@ type LoggerConfig struct {
 func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ctx := context.WithValue(r.Context(), tokenSub{}, 12)
-		r = r.WithContext(ctx)
 		user := r.Context().Value(tokenSub{})
 
 		next(w, r)

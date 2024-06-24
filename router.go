@@ -16,7 +16,7 @@ type routerBuilder struct {
 	option          bool
 }
 
-type muxOption func(*routerBuilder) error
+type routerOption func(*routerBuilder) error
 
 type routeDefinition struct {
 	pattern         string
@@ -27,7 +27,7 @@ type routeDefinition struct {
 // Router is the entrypoint to build the http.ServeMux. Be careful Router is
 // intended to be at the root, if you want nested router use WithRouter instead
 //
-// Available muxOption:
+// Available routerOption:
 //
 //   - WithOption()
 //   - WithPrefix()
@@ -39,8 +39,9 @@ type routeDefinition struct {
 //   - WithAuthJWT()
 //   - WithStructLogger()
 //   - WithMiddleware()
-//   - WithRecoverer
-func Router(opts ...muxOption) (*http.ServeMux, error) {
+//   - WithRecoverer()
+//   - WithContentType()
+func Router(opts ...routerOption) (*http.ServeMux, error) {
 	router, err := initRouter(opts...)
 	if err != nil {
 		return nil, err
@@ -53,7 +54,7 @@ func Router(opts ...muxOption) (*http.ServeMux, error) {
 	return mux, nil
 }
 
-func initRouter(opts ...muxOption) (routerBuilder, error) {
+func initRouter(opts ...routerOption) (routerBuilder, error) {
 	rb := routerBuilder{
 		prefix:          "",
 		middlewareStack: []Middleware{},
@@ -99,7 +100,7 @@ func initRouter(opts ...muxOption) (routerBuilder, error) {
 	}
 	for path, methods := range routeMethods {
 		rb.routeStack = append(rb.routeStack, routeDefinition{
-			pattern:         fmt.Sprintf("OPTION %s", path),
+			pattern:         fmt.Sprintf("OPTIONS %s", path),
 			handler:         optionHandler(methods),
 			middlewareStack: []Middleware{},
 		})
@@ -112,7 +113,6 @@ func initRouter(opts ...muxOption) (routerBuilder, error) {
 
 	// add middlewares
 	for i := range rb.routeStack {
-		fmt.Println(rb.routeStack[i].pattern)
 		rb.routeStack[i].pattern = applyPrefix(rb.routeStack[i].pattern, rb.prefix)
 		rb.routeStack[i].middlewareStack = append(rb.middlewareStack, rb.routeStack[i].middlewareStack...)
 	}
@@ -121,7 +121,7 @@ func initRouter(opts ...muxOption) (routerBuilder, error) {
 }
 
 // WithRouter adds a subrouter to the current router
-func WithRouter(opts ...muxOption) muxOption {
+func WithRouter(opts ...routerOption) routerOption {
 	return func(rb *routerBuilder) error {
 		router, err := initRouter(opts...)
 		if err != nil {
@@ -135,7 +135,7 @@ func WithRouter(opts ...muxOption) muxOption {
 
 // WithPrefix set the prefix path for the current router. Keep in mind that
 // the current router also inherit from all it's parents prefixes
-func WithPrefix(prefix string) muxOption {
+func WithPrefix(prefix string) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.prefix = fmt.Sprintf("%s%s", rb.prefix, prefix)
 		if prefix == "" {
@@ -152,7 +152,7 @@ func WithPrefix(prefix string) muxOption {
 }
 
 // WithRoute adds a new route to the current router
-func WithRoute(pattern string, handler http.HandlerFunc) muxOption {
+func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.routeStack = append(
 			rb.routeStack,
@@ -169,7 +169,7 @@ func WithRoute(pattern string, handler http.HandlerFunc) muxOption {
 // WithOption is adding if set to true a handler for OPTION method for every child
 // route created. You can deactivate this behaviour in child SubRouter by
 // setting it to false
-func WithOption(active bool) muxOption {
+func WithOption(active bool) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.option = active
 		return nil

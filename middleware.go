@@ -18,7 +18,7 @@ func chainMiddleware(h http.HandlerFunc, middlewareStack ...Middleware) http.Han
 }
 
 // WithMiddleware is used to add a custom middleware to the current Router
-func WithMiddleware(middleware Middleware) muxOption {
+func WithMiddleware(middleware Middleware) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.middlewareStack = append(rb.middlewareStack, middleware)
 		return nil

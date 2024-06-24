@@ -15,7 +15,7 @@ type contentTypeOption func(*contentTypeConfig) error
 
 // WithContentType restricts the access to the current router and all it's
 // children to the specified set of Content-Type
-func WithContentType(opts ...contentTypeOption) muxOption {
+func WithContentType(opts ...contentTypeOption) routerOption {
 	return func(rb *routerBuilder) error {
 		config := &contentTypeConfig{
 			types: []string{},
@@ -32,21 +32,33 @@ func WithContentType(opts ...contentTypeOption) muxOption {
 }
 
 func WithApplicationJSON(ctc *contentTypeConfig) error {
+	if slices.Contains(ctc.types, "application/json") {
+		return fmt.Errorf("duplicate Content-Type")
+	}
 	ctc.types = append(ctc.types, "application/json")
 	return nil
 }
 
 func WithApplicationXML(ctc *contentTypeConfig) error {
+	if slices.Contains(ctc.types, "application/xml") {
+		return fmt.Errorf("duplicate Content-Type")
+	}
 	ctc.types = append(ctc.types, "application/xml")
 	return nil
 }
 
 func WithFormEncoded(ctc *contentTypeConfig) error {
+	if slices.Contains(ctc.types, "application/x-www-form-urlencoded") {
+		return fmt.Errorf("duplicate Content-Type")
+	}
 	ctc.types = append(ctc.types, "application/x-www-form-urlencoded")
 	return nil
 }
 
 func WithFormData(ctc *contentTypeConfig) error {
+	if slices.Contains(ctc.types, "multipart/form-data") {
+		return fmt.Errorf("duplicate Content-Type")
+	}
 	ctc.types = append(ctc.types, "multipart/form-data")
 	return nil
 }

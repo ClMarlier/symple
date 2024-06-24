@@ -1,6 +1,5 @@
 ### Symple
 **work in progress**
-- Voir pour separer en package le code, ie: middleware
 
 ```go
 package main

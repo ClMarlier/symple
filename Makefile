@@ -6,3 +6,4 @@ check:
 
 cover:
 	go test -coverprofile=cover.out -coverpkg=symple
+	go tool cover -html="cover.out"
