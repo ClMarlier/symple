@@ -15,12 +15,12 @@ func TestRecoverer(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			name:           "recoverer writing error",
+			name:           "writing error stacktrace",
 			writeError:     true,
 			expectedResult: false,
 		},
 		{
-			name:           "recoverer not writing error",
+			name:           "not writing error stacktrace",
 			writeError:     false,
 			expectedResult: true,
 		},

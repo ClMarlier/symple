@@ -34,7 +34,7 @@ func TestChainMiddleware(t *testing.T) {
 			expectedBody: "1234",
 		},
 		{
-			name:         "nested layer middleware",
+			name:         "nested layer middleware 2",
 			path:         "/nested_test2",
 			expectedBody: "1256",
 		},

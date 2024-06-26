@@ -12,42 +12,42 @@ func TestRouter(t *testing.T) {
 		name        string
 		path        string
 		requestPath string
-		prefix      routerOption
+		prefix      string
 		shouldError bool
 	}{
 		{
 			name:        "empty prefix with method",
 			path:        "GET /hello",
 			requestPath: "/hello",
-			prefix:      WithPrefix(""),
+			prefix:      "",
 			shouldError: false,
 		},
 		{
 			name:        "empty prefix without method",
 			path:        "/hello",
 			requestPath: "/hello",
-			prefix:      WithPrefix(""),
+			prefix:      "",
 			shouldError: false,
 		},
 		{
 			name:        "with prefix with method",
 			path:        "GET /hello",
 			requestPath: "/prefix/hello",
-			prefix:      WithPrefix("/prefix"),
+			prefix:      "/prefix",
 			shouldError: false,
 		},
 		{
-			name:        "empty prefix without method",
+			name:        "with prefix without method",
 			path:        "/hello",
 			requestPath: "/prefix/hello",
-			prefix:      WithPrefix("/prefix"),
+			prefix:      "/prefix",
 			shouldError: false,
 		},
 		{
 			name:        "wrong prefix error",
 			path:        "/hello",
 			requestPath: "/prefix/hello",
-			prefix:      WithPrefix("/broken prefix"),
+			prefix:      "/broken prefix",
 			shouldError: true,
 		},
 	}
@@ -58,7 +58,7 @@ func TestRouter(t *testing.T) {
 			req := httptest.NewRequest("GET", val.requestPath, bytes.NewReader([]byte("body")))
 			mux, err := Router(
 				WithRouter(
-					val.prefix,
+					WithPrefix(val.prefix),
 					WithRoute(val.path, func(w http.ResponseWriter, r *http.Request) {}),
 				),
 			)

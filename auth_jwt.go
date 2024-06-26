@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strconv"
+	"slices"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -52,39 +52,33 @@ func WithSecret(secret string) authJwtOption {
 }
 
 func WithHS256(ajc *authJwtConfig) error {
+	if slices.Contains(ajc.methods, "HS256") {
+		return fmt.Errorf("duplicate signing method")
+	}
 	ajc.methods = append(ajc.methods, "HS256")
 	return nil
 }
 
-func subFromToken(tokenString string, secret string, methods []string) (int, error) {
-	if tokenString == "" {
-		return 0, nil
-	}
-
+func subFromToken(tokenString string, secret string, methods []string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return 0, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
-		}
 		return []byte(secret), nil
-	}, jwt.WithValidMethods(methods),
+	},
+		jwt.WithValidMethods(methods),
+		jwt.WithIssuedAt(),
 	)
 
 	if err != nil {
-		return 0, err
+		return "", err
 	}
 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		sub, err := claims.GetSubject()
 		if err != nil {
-			return 0, err
+			return "", err
 		}
-		user, err := strconv.Atoi(sub)
-		if err != nil {
-			return 0, err
-		}
-		return user, nil
+		return sub, nil
 	} else {
-		return 0, err
+		return "", err
 	}
 }
 
@@ -97,7 +91,7 @@ func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
 		}
 		splitedTokenString := strings.Split(tokenString, " ")
 		if len(splitedTokenString) != 2 {
-			http.Error(w, "Invalid format for Authorization Header", http.StatusUnauthorized)
+			http.Error(w, "Invalid format for Authorization Header ", http.StatusUnauthorized)
 			return
 		}
 		if splitedTokenString[0] != "Bearer" {
@@ -108,7 +102,7 @@ func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusUnauthorized)
 			return
-		} else if sub != 0 {
+		} else if sub != "" {
 			ctx := context.WithValue(r.Context(), tokenSub{}, sub)
 			r = r.WithContext(ctx)
 		}

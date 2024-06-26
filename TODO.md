@@ -2,3 +2,5 @@
 - Ajouter des recettes: 404Handler
 - Remove the jwt dependacy 
 - Rework le option handler qui est une option non utilisé et toujour active
+- Tester la connectivité entre AuthJWT et Logger (user et error)
+- Sortir la banniere du montage du serveur sinon les test sont illisibles

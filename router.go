@@ -50,7 +50,6 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 	for _, route := range router.routeStack {
 		mux.HandleFunc(route.pattern, chainMiddleware(route.handler, route.middlewareStack...))
 	}
-	beforeStart()
 	return mux, nil
 }
 
@@ -196,7 +195,7 @@ func applyPrefix(pattern string, prefix string) string {
 	return newPath
 }
 
-func beforeStart() {
+func Startup() {
 	fmt.Println("")
 	fmt.Println("\033[0;30m\033[102m  ____                            _        \033[0m")
 	fmt.Println("\033[0;30m\033[102m / ___|  _   _  _ __ ___   _ __  | |  ___  \033[0m")
