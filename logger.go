@@ -40,7 +40,7 @@ func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 					"path", r.URL.Path,
 					"body", body,
 					"user", user,
-					"time", time.Since(start).String(),
+					"duration", time.Since(start).String(),
 				)
 			} else if tracker.error != nil {
 				body := getRequestBody(r)
@@ -51,7 +51,7 @@ func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
 					"path", r.URL.Path,
 					"body", body,
 					"user", user,
-					"time", time.Since(start).String(),
+					"duration", time.Since(start).String(),
 					"error", tracker.error,
 				)
 			}

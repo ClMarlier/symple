@@ -51,18 +51,21 @@ func WithSecret(secret string) authJwtOption {
 	}
 }
 
-func WithHS256(ajc *authJwtConfig) error {
-	if slices.Contains(ajc.methods, "HS256") {
-		return fmt.Errorf("duplicate signing method")
+func WithSigningMethod(method jwt.SigningMethod) authJwtOption {
+	return func(ajc *authJwtConfig) error {
+		if slices.Contains(ajc.methods, method.Alg()) {
+			return fmt.Errorf("duplicate signing method")
+		}
+		ajc.methods = append(ajc.methods, method.Alg())
+		return nil
 	}
-	ajc.methods = append(ajc.methods, "HS256")
-	return nil
 }
 
 func subFromToken(tokenString string, secret string, methods []string) (string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
 	},
+		jwt.WithExpirationRequired(),
 		jwt.WithValidMethods(methods),
 		jwt.WithIssuedAt(),
 	)
@@ -71,36 +74,44 @@ func subFromToken(tokenString string, secret string, methods []string) (string, 
 		return "", err
 	}
 
-	if claims, ok := token.Claims.(jwt.MapClaims); ok {
-		sub, err := claims.GetSubject()
-		if err != nil {
-			return "", err
-		}
-		return sub, nil
-	} else {
-		return "", err
+	sub, err := token.Claims.GetSubject()
+	if err != nil || sub == "" {
+		return "", fmt.Errorf("'sub' claim is invalid")
 	}
+	return sub, nil
 }
 
 func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tokenString := r.Header.Get("Authorization")
 		if len(tokenString) == 0 {
-			http.Error(w, "Missing Authorization Header", http.StatusUnauthorized)
+			ErrorResponse(
+				w,
+				fmt.Errorf("Missing Authorization Header"),
+				http.StatusUnauthorized)
 			return
 		}
 		splitedTokenString := strings.Split(tokenString, " ")
 		if len(splitedTokenString) != 2 {
-			http.Error(w, "Invalid format for Authorization Header ", http.StatusUnauthorized)
+			ErrorResponse(
+				w,
+				fmt.Errorf("Invalid format for Authorization Header "),
+				http.StatusUnauthorized)
 			return
 		}
 		if splitedTokenString[0] != "Bearer" {
-			http.Error(w, "The Authorization Header should be a Bearer", http.StatusUnauthorized)
+			ErrorResponse(
+				w,
+				fmt.Errorf("The Authorization Header should be a Bearer"),
+				http.StatusUnauthorized)
 			return
 		}
 		sub, err := subFromToken(splitedTokenString[1], ac.secret, ac.methods)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusUnauthorized)
+			ErrorResponse(
+				w,
+				err,
+				http.StatusUnauthorized)
 			return
 		} else if sub != "" {
 			ctx := context.WithValue(r.Context(), tokenSub{}, sub)
