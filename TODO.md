@@ -7,5 +7,4 @@
 - Refaire tout les commentaires de documentation avec un standard
 - Evaluer l'interet d'un caching middleware 
 - Evaluer l'interet d'un autre middleware
-- Penser a faire un symple.Response mirroir de symple.ErrorResponse
 - Voir pour d'autres helpers utiles sur quazi tout projet
