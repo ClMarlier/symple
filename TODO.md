@@ -4,3 +4,8 @@
 - Rework le option handler qui est une option non utilisé et toujour active
 - Tester la connectivité entre AuthJWT et Logger (user et error)
 - Reflechir a quoi faire de la banniere
+- Refaire tout les commentaires de documentation avec un standard
+- Evaluer l'interet d'un caching middleware 
+- Evaluer l'interet d'un autre middleware
+- Penser a faire un symple.Response mirroir de symple.ErrorResponse
+- Voir pour d'autres helpers utiles sur quazi tout projet

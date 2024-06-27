@@ -116,7 +116,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "Missing Authorization Header",
+			expectedResponse:   "missing authorization header",
 		},
 		{
 			name:               "not a Bearer token",
@@ -124,7 +124,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "The Authorization Header should be a Bearer",
+			expectedResponse:   "the authorization header should be a Bearer",
 		},
 		{
 			name:               "expired",

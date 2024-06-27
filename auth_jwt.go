@@ -87,7 +87,7 @@ func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
 		if len(tokenString) == 0 {
 			ErrorResponse(
 				w,
-				fmt.Errorf("Missing Authorization Header"),
+				fmt.Errorf("missing authorization header"),
 				http.StatusUnauthorized)
 			return
 		}
@@ -95,14 +95,14 @@ func (ac *authJwtConfig) authJWT(next http.HandlerFunc) http.HandlerFunc {
 		if len(splitedTokenString) != 2 {
 			ErrorResponse(
 				w,
-				fmt.Errorf("Invalid format for Authorization Header "),
+				fmt.Errorf("invalid format for authorization header "),
 				http.StatusUnauthorized)
 			return
 		}
 		if splitedTokenString[0] != "Bearer" {
 			ErrorResponse(
 				w,
-				fmt.Errorf("The Authorization Header should be a Bearer"),
+				fmt.Errorf("the authorization header should be a Bearer"),
 				http.StatusUnauthorized)
 			return
 		}
