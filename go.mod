@@ -1,4 +1,4 @@
-module symple
+module github.com/ClMarlier/symple
 
 go 1.22.3
 
