@@ -166,7 +166,10 @@ func TestAuthJWT(t *testing.T) {
 					func(w http.ResponseWriter, r *http.Request) {
 						sub, ok := r.Context().Value(tokenSub{}).(string)
 						if !ok {
-							http.Error(w, "could'nt get tokenSub from context", http.StatusInternalServerError)
+							ErrorResponse(
+								w,
+								fmt.Errorf("could'nt get tokenSub from context"),
+								http.StatusInternalServerError)
 						}
 						w.Write([]byte(sub))
 					}),

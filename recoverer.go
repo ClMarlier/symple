@@ -10,7 +10,8 @@ type recovererConfig struct {
 	writeError bool
 }
 
-// WithRecoverer handle gracefully any panic that could occur
+// WithRecoverer handle gracefully any panic that could occur, if used after
+// WithStructLogger the error will be logged
 func WithRecoverer(writeError bool) routerOption {
 	return func(rb *routerBuilder) error {
 		config := &recovererConfig{writeError: writeError}

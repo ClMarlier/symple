@@ -69,7 +69,3 @@ func panicError(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(fmt.Sprintf("666/%d = %d", n, res)))
 }
 ```
-
-## TODO
-- reflechir a éviter que le recoverer ne renvoi le contenu au client (probablement mettre un recovererConfig avec un boolean on/off error details)
-- voir pour le cache

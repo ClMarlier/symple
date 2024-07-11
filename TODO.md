@@ -1,10 +1,9 @@
-- Voir pour separer en package le code, ie: middleware
-- Ajouter des recettes: 404Handler
-- Remove the jwt dependacy (pas sur de celui la)
+- Remove the jwt dependancy (pas sur de celui la)
 - Rework le option handler qui est une option non utilisé et toujour active
-- Tester la connectivité entre AuthJWT et Logger (user et error)
-- Reflechir a quoi faire de la banniere
-- Refaire tout les commentaires de documentation avec un standard
+- Tester la connectivité entre AuthJWT et Logger: user
+- Reflechir a quoi faire de la banniere "SYMPLE" au lancement
+- Refaire tout les commentaires de documentation avec un meilleur standard
 - Evaluer l'interet d'un caching middleware 
 - Evaluer l'interet d'un autre middleware
+- Ajouter des recettes: 404Handler
 - Voir pour d'autres helpers utiles sur quazi tout projet
