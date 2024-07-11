@@ -1,8 +1,15 @@
-### Symple
-**work in progress**
+# Symple v0.01
+## Motivation
+TODO
+
+## Install
+
+`go get -u github.com/ClMarlier/symple`
+
+## Features
 
 
-# Usage
+## Usage
 ```go
 package main
 
