@@ -12,4 +12,4 @@ test:
 
 .PHONY: cover
 cover:
-	@go test -coverprofile=cover.out -coverpkg=symple && go tool cover -html=cover.out && rm cover.out
+	@go test -coverprofile=cover.out -coverpkg=./... && go tool cover -html=cover.out && rm cover.out

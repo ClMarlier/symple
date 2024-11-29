@@ -7,61 +7,16 @@ import (
 	"strings"
 )
 
-type contentTypeConfig struct {
-	types []string
-}
+type ContentType string
 
-type contentTypeOption func(*contentTypeConfig) error
-
-// WithContentType restricts the access to the current router and all it's
-// children to the specified set of Content-Type
-func WithContentType(opts ...contentTypeOption) routerOption {
-	return func(rb *routerBuilder) error {
-		config := &contentTypeConfig{
-			types: []string{},
-		}
-
-		for _, option := range opts {
-			if err := option(config); err != nil {
-				return err
-			}
-		}
-		rb.middlewareStack = append(rb.middlewareStack, config.contentType)
-		return nil
-	}
-}
-
-func WithApplicationJSON(ctc *contentTypeConfig) error {
-	if slices.Contains(ctc.types, "application/json") {
-		return fmt.Errorf("duplicate Content-Type")
-	}
-	ctc.types = append(ctc.types, "application/json")
-	return nil
-}
-
-func WithApplicationXML(ctc *contentTypeConfig) error {
-	if slices.Contains(ctc.types, "application/xml") {
-		return fmt.Errorf("duplicate Content-Type")
-	}
-	ctc.types = append(ctc.types, "application/xml")
-	return nil
-}
-
-func WithFormEncoded(ctc *contentTypeConfig) error {
-	if slices.Contains(ctc.types, "application/x-www-form-urlencoded") {
-		return fmt.Errorf("duplicate Content-Type")
-	}
-	ctc.types = append(ctc.types, "application/x-www-form-urlencoded")
-	return nil
-}
-
-func WithFormData(ctc *contentTypeConfig) error {
-	if slices.Contains(ctc.types, "multipart/form-data") {
-		return fmt.Errorf("duplicate Content-Type")
-	}
-	ctc.types = append(ctc.types, "multipart/form-data")
-	return nil
-}
+const (
+	ContentTypeTextPlain   ContentType = "text/plain"
+	ContentTypeTextHtml    ContentType = "text/html"
+	ContentTypeJson        ContentType = "application/json"
+	ContentTypeXml         ContentType = "application/xml"
+	ContentTypeFormEncoded ContentType = "application/x-www-form-urlencoded"
+	ContentTypeFormData    ContentType = "multipart/form-data"
+)
 
 func getContentType(r *http.Request) string {
 	contentType := r.Header.Get("Content-Type")
@@ -71,21 +26,55 @@ func getContentType(r *http.Request) string {
 	return contentType
 }
 
-func (ctc *contentTypeConfig) contentType(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.ContentLength != 0 {
-			contentType := getContentType(r)
-			if !slices.Contains(ctc.types, contentType) {
-				ErrorResponse(
-					w,
-					fmt.Errorf(
-						"invalid Content-Type, found %s, wanted %s",
-						contentType,
-						strings.Join(ctc.types, ", ")),
-					http.StatusUnsupportedMediaType)
-				return
+func requestContentType(cts []string) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if r.ContentLength != 0 {
+				contentType := getContentType(r)
+				if !slices.Contains(cts, contentType) {
+					ErrorResponse(
+						w,
+						fmt.Errorf(
+							"invalid Content-Type, found %s, wanted %s",
+							contentType,
+							strings.Join(cts, ", ")),
+						http.StatusUnsupportedMediaType)
+					return
+				}
+			}
+			next(w, r)
+		}
+	}
+}
+
+func WithRequestContentType(cts []ContentType) routerOption {
+	return func(rb *routerBuilder) error {
+		stringContentType := make([]string, 0, len(cts))
+		for _, ct := range cts {
+			if !slices.Contains(stringContentType, string(ct)) {
+				stringContentType = append(stringContentType, string(ct))
+			} else {
+				return fmt.Errorf("found duplicate request Content-Type config %s", string(ct))
 			}
 		}
-		next(w, r)
+
+		rb.middlewareStack = append(rb.middlewareStack, requestContentType(stringContentType))
+		return nil
+	}
+}
+
+func responseContentType(ct ContentType) func(http.HandlerFunc) http.HandlerFunc {
+	return func(next http.HandlerFunc) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Add("Content-Type", string(ct))
+			next(w, r)
+		}
+	}
+}
+
+func WithResponseContentType(ct ContentType) routerOption {
+	return func(rb *routerBuilder) error {
+		rb.middlewareStack = append(rb.middlewareStack, responseContentType(ct))
+		return nil
 	}
 }
