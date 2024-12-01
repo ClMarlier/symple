@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -80,9 +81,9 @@ func TestRouter(t *testing.T) {
 	}
 }
 
-func TestWithOption(t *testing.T) {
+func TestWithOptions(t *testing.T) {
 	mux1, err := Router(
-		WithOption(true),
+		WithOptions(true),
 		WithRoute("GET /test", func(w http.ResponseWriter, r *http.Request) {}),
 		WithRoute("PATCH /test", func(w http.ResponseWriter, r *http.Request) {}),
 	)
@@ -91,7 +92,7 @@ func TestWithOption(t *testing.T) {
 	}
 
 	mux2, err := Router(
-		WithOption(true),
+		WithOptions(true),
 		WithRoute("/test", func(w http.ResponseWriter, r *http.Request) {}),
 	)
 	if err != nil {
@@ -126,5 +127,19 @@ func TestWithOption(t *testing.T) {
 				t.Fatalf("Expected %s found %s", val.expect, accept)
 			}
 		})
+	}
+}
+
+func TestWithOptionsPatternError(t *testing.T) {
+	_, err := Router(
+		WithOptions(true),
+		WithRoute("GET POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+	)
+	if err == nil {
+		t.Fatal("should return an error")
+
+	}
+	if !strings.Contains(err.Error(), "malformated handler pattern") {
+		t.Fatalf("should return a malformated error patern, found: %s", err.Error())
 	}
 }

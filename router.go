@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 type routerBuilder struct {
@@ -13,12 +15,14 @@ type routerBuilder struct {
 	middlewareStack []Middleware
 	routeStack      []routeDefinition
 	subRouter       []routerBuilder
-	option          bool
+	options         bool
+	optionsIds      *map[string]bool
 }
 
 type routerOption func(*routerBuilder) error
 
 type routeDefinition struct {
+	id              string
 	pattern         string
 	handler         http.HandlerFunc
 	middlewareStack []Middleware
@@ -29,7 +33,7 @@ type routeDefinition struct {
 //
 // Available routerOption:
 //
-//   - WithOption()
+//   - WithOptions()
 //   - WithPrefix()
 //   - WithRoute()
 //   - WithRouter()
@@ -47,11 +51,47 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	mux := http.NewServeMux()
+	options := make(map[string][]string)
+
 	for _, route := range router.routeStack {
 		mux.HandleFunc(route.pattern, chainMiddleware(route.handler, route.middlewareStack...))
+
+		// if route is tagged for options
+		if _, ok := (*router.optionsIds)[route.id]; ok {
+			path, methods, err := parsePattern(route.pattern)
+			if err != nil {
+				return nil, err
+			}
+
+			var nextMethods []string = []string{}
+			if val, ok := options[path]; ok {
+				nextMethods = val
+			}
+
+			for _, method := range methods {
+				if !slices.Contains(nextMethods, method) {
+					nextMethods = append(nextMethods, method)
+				}
+			}
+			options[path] = nextMethods
+		}
 	}
+
+	// Add handler with options methods to all registered routes
+	for key, value := range options {
+		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", key), optionHandler(value))
+	}
+
 	return mux, nil
+}
+
+func transfer(optionsIds *map[string]bool) routerOption {
+	return func(rb *routerBuilder) error {
+		rb.optionsIds = optionsIds
+		return nil
+	}
 }
 
 func initRouter(opts ...routerOption) (routerBuilder, error) {
@@ -60,7 +100,8 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 		middlewareStack: []Middleware{},
 		routeStack:      []routeDefinition{},
 		subRouter:       []routerBuilder{},
-		option:          false,
+		options:         false,
+		optionsIds:      &map[string]bool{},
 	}
 
 	// Load options
@@ -68,42 +109,6 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 		if err := opt(&rb); err != nil {
 			return routerBuilder{}, err
 		}
-	}
-
-	// add routes for HTTP OPTION method
-	routeMethods := map[string][]string{}
-	for _, route := range rb.routeStack {
-		splitted := strings.Split(route.pattern, " ")
-		if len(splitted) == 1 {
-			routeMethods[applyPrefix(route.pattern, rb.prefix)] = []string{
-				"GET",
-				"HEAD",
-				"POST",
-				"PUT",
-				"DELETE",
-				"CONNECT",
-				"OPTIONS",
-				"TRACE",
-				"PATCH"}
-			continue
-		}
-
-		if len(splitted) == 2 {
-			method := splitted[0]
-			path := applyPrefix(splitted[1], rb.prefix)
-			if _, ok := routeMethods[path]; !ok {
-				routeMethods[path] = []string{method}
-			} else if !slices.Contains(routeMethods[path], method) {
-				routeMethods[path] = append(routeMethods[path], method)
-			}
-		}
-	}
-	for path, methods := range routeMethods {
-		rb.routeStack = append(rb.routeStack, routeDefinition{
-			pattern:         fmt.Sprintf("OPTIONS %s", path),
-			handler:         optionHandler(methods),
-			middlewareStack: []Middleware{},
-		})
 	}
 
 	// add subrouters route to routeStack
@@ -117,13 +122,20 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 		rb.routeStack[i].middlewareStack = append(rb.middlewareStack, rb.routeStack[i].middlewareStack...)
 	}
 
+	// handle options, sitemap and all route
+	for _, route := range rb.routeStack {
+		if rb.options {
+			(*rb.optionsIds)[route.id] = true
+		}
+	}
+
 	return rb, nil
 }
 
 // WithRouter adds a subrouter to the current router
 func WithRouter(opts ...routerOption) routerOption {
 	return func(rb *routerBuilder) error {
-		router, err := initRouter(opts...)
+		router, err := initRouter(append(opts, transfer(rb.optionsIds))...)
 		if err != nil {
 			return err
 		}
@@ -154,9 +166,14 @@ func WithPrefix(prefix string) routerOption {
 // WithRoute adds a new route to the current router
 func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 	return func(rb *routerBuilder) error {
+		id, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
+				id:              id.String(),
 				pattern:         pattern,
 				handler:         handler,
 				middlewareStack: []Middleware{},
@@ -166,12 +183,12 @@ func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 	}
 }
 
-// WithOption is adding if set to true a handler for OPTION method for every child
+// WithOptions is adding if set to true a handler for OPTION method for every child
 // route created. You can deactivate this behaviour in child SubRouter by
 // setting it to false
-func WithOption(active bool) routerOption {
+func WithOptions(active bool) routerOption {
 	return func(rb *routerBuilder) error {
-		rb.option = active
+		rb.options = active
 		return nil
 	}
 }
@@ -196,6 +213,29 @@ func applyPrefix(pattern string, prefix string) string {
 	return newPath
 }
 
+func parsePattern(pattern string) (string, []string, error) {
+	splitted := strings.Split(pattern, " ")
+	if len(splitted) == 1 {
+		return pattern,
+			[]string{
+				"GET",
+				"HEAD",
+				"POST",
+				"PUT",
+				"DELETE",
+				"CONNECT",
+				"OPTIONS",
+				"TRACE",
+				"PATCH"},
+			nil
+	}
+
+	if len(splitted) == 2 {
+		return splitted[1], []string{splitted[0]}, nil
+	}
+	return "", []string{}, fmt.Errorf("malformated handler pattern %s", pattern)
+}
+
 func Startup() {
 	fmt.Println("")
 	fmt.Println("\033[0;30m\033[102m  ____                            _        \033[0m")
@@ -205,5 +245,4 @@ func Startup() {
 	fmt.Println("\033[0;30m\033[102m |____/  \\__, ||_| |_| |_|| .__/ |_| \\___| \033[0m")
 	fmt.Println("\033[0;30m\033[102m         |___/            |_|              \033[0m")
 	fmt.Println("\033[0;30m\033[102m                                           \033[0m")
-
 }

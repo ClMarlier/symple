@@ -35,7 +35,7 @@ func TestRecoverer(t *testing.T) {
 				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) { panic("error") }),
 			)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 
 			mux.ServeHTTP(recorder, req)
@@ -43,7 +43,7 @@ func TestRecoverer(t *testing.T) {
 			res := recorder.Result()
 			body, err := io.ReadAll(res.Body)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 
 			if (string(body) == "internal server error\n") != val.expectedResult {

@@ -62,7 +62,7 @@ func TestWithRequestContentType(t *testing.T) {
 				if strings.Contains(err.Error(), val.error) {
 					return
 				}
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 
 			recorder := httptest.NewRecorder()
@@ -100,7 +100,7 @@ func TestWithResponseContentType(t *testing.T) {
 				if strings.Contains(err.Error(), val.error) {
 					return
 				}
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 
 			recorder := httptest.NewRecorder()

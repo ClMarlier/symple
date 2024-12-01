@@ -57,7 +57,7 @@ func TestChainMiddleware(t *testing.T) {
 		),
 	)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err.Error())
 	}
 
 	for _, val := range testTable {
@@ -69,7 +69,7 @@ func TestChainMiddleware(t *testing.T) {
 			res := recorder.Result()
 			body, err := io.ReadAll(res.Body)
 			if err != nil {
-				t.Fatalf(err.Error())
+				t.Fatal(err.Error())
 			}
 
 			if string(body) != val.expectedBody {

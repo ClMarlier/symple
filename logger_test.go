@@ -94,7 +94,7 @@ func TestWithStructLogger(t *testing.T) {
 			}),
 		)
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 
 		t.Run(val.name, func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestWithStructLogger(t *testing.T) {
 			case "json":
 				byteBody, err := json.Marshal(val.body)
 				if err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err.Error())
 				}
 				req := httptest.NewRequest("POST", "/test", bytes.NewReader(byteBody))
 				req.Header.Add("Content-Type", "application/json")
@@ -133,7 +133,7 @@ func TestWithStructLogger(t *testing.T) {
 			default:
 				byteBody, err := json.Marshal(val.body)
 				if err != nil {
-					t.Fatalf(err.Error())
+					t.Fatal(err.Error())
 				}
 				req := httptest.NewRequest("POST", "/test", bytes.NewReader(byteBody))
 				req.Header.Add("Content-Type", "text/html")
@@ -164,7 +164,7 @@ func TestWithStructLogger(t *testing.T) {
 			if val.error != "" && !strings.HasPrefix(decodedLog.Error, val.error) {
 				t.Fatalf("wrong error value expecting %s, found %s", val.error, decodedLog.Error)
 			}
-			if val.panic != "" && strings.Index(decodedLog.Error, val.panic) == -1 {
+			if val.panic != "" && !strings.Contains(decodedLog.Error, val.panic) {
 				t.Fatalf("wrong error value expecting %s, found %s", val.panic, decodedLog.Error)
 			}
 		})
