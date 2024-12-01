@@ -40,7 +40,8 @@ type routeDefinition struct {
 //   - WithStructLogger()
 //   - WithMiddleware()
 //   - WithRecoverer()
-//   - WithContentType()
+//   - WithRequestContentType()
+//   - WithResponseContentType()
 func Router(opts ...routerOption) (*http.ServeMux, error) {
 	router, err := initRouter(opts...)
 	if err != nil {

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestWithContentType(t *testing.T) {
+func TestWithRequestContentType(t *testing.T) {
 	testTable := []struct {
 		name          string
 		contentType   string
@@ -74,6 +74,43 @@ func TestWithContentType(t *testing.T) {
 
 			if res.StatusCode != val.expectedValue {
 				t.Fatalf("Invalid status values: %d, expected %d", res.StatusCode, val.expectedValue)
+			}
+		})
+	}
+}
+
+func TestWithResponseContentType(t *testing.T) {
+	testTable := []struct {
+		name        string
+		contentType ContentType
+		error       string
+	}{
+		{
+			name:        "good contencontentType",
+			contentType: ContentTypeXml,
+		},
+	}
+	for _, val := range testTable {
+		t.Run(val.name, func(t *testing.T) {
+			mux, err := Router(
+				WithResponseContentType(val.contentType),
+				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+			)
+			if err != nil {
+				if strings.Contains(err.Error(), val.error) {
+					return
+				}
+				t.Fatalf(err.Error())
+			}
+
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte("body")))
+			mux.ServeHTTP(recorder, req)
+
+			res := recorder.Result()
+			ct := res.Header.Get("Content-Type")
+			if ct != string(val.contentType) {
+				t.Fatalf("Invalid response 'Content-Type': %s, expected %s", string(val.contentType), ct)
 			}
 		})
 	}
