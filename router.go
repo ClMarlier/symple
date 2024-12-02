@@ -6,23 +6,62 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-
-	"github.com/google/uuid"
 )
+
+var sequenceState int = 0
+var extraState map[int]routeExtra = map[int]routeExtra{}
+
+func nextSequence() {
+	sequenceState += 1
+}
+
+func getCount() int {
+	return sequenceState
+}
+
+func getExtra(key int) (routeExtra, bool) {
+	val, ok := extraState[key]
+	return val, ok
+}
+
+func setExtra(key int, value routeExtra) {
+	extraState[key] = value
+}
+
+type troolean int
+
+const (
+	unset troolean = iota
+	triFalse
+	triTrue
+)
+
+func toTroolean(b bool) troolean {
+	if b {
+		return triTrue
+	} else {
+		return triFalse
+	}
+}
+
+type routeExtra struct {
+	options troolean
+	sitemap troolean
+}
 
 type routerBuilder struct {
 	prefix          string
 	middlewareStack []Middleware
 	routeStack      []routeDefinition
 	subRouter       []routerBuilder
-	options         bool
-	optionsIds      *map[string]bool
+	options         troolean
+	sitemap         troolean
 }
 
 type routerOption func(*routerBuilder) error
 
 type routeDefinition struct {
-	id              string
+	id              int
 	pattern         string
 	handler         http.HandlerFunc
 	middlewareStack []Middleware
@@ -54,28 +93,36 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 
 	mux := http.NewServeMux()
 	options := make(map[string][]string)
-
+	sitemap := make([]string, 0)
 	for _, route := range router.routeStack {
 		mux.HandleFunc(route.pattern, chainMiddleware(route.handler, route.middlewareStack...))
 
-		// if route is tagged for options
-		if _, ok := (*router.optionsIds)[route.id]; ok {
+		if val, ok := getExtra(route.id); ok {
 			path, methods, err := parsePattern(route.pattern)
 			if err != nil {
 				return nil, err
 			}
 
-			var nextMethods []string = []string{}
-			if val, ok := options[path]; ok {
-				nextMethods = val
+			if val.options == triTrue {
+
+				var nextMethods []string = []string{}
+				if val, ok := options[path]; ok {
+					nextMethods = val
+				}
+
+				for _, method := range methods {
+					if !slices.Contains(nextMethods, method) {
+						nextMethods = append(nextMethods, method)
+					}
+				}
+				options[path] = nextMethods
 			}
 
-			for _, method := range methods {
-				if !slices.Contains(nextMethods, method) {
-					nextMethods = append(nextMethods, method)
+			if val.sitemap == triTrue {
+				if !slices.Contains(sitemap, path) {
+					sitemap = append(sitemap, path)
 				}
 			}
-			options[path] = nextMethods
 		}
 	}
 
@@ -84,14 +131,11 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", key), optionHandler(value))
 	}
 
-	return mux, nil
-}
-
-func transfer(optionsIds *map[string]bool) routerOption {
-	return func(rb *routerBuilder) error {
-		rb.optionsIds = optionsIds
-		return nil
+	// Add sitemap.xml handler if needed
+	if len(sitemap) > 0 {
+		fmt.Println(sitemap)
 	}
+	return mux, nil
 }
 
 func initRouter(opts ...routerOption) (routerBuilder, error) {
@@ -100,8 +144,7 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 		middlewareStack: []Middleware{},
 		routeStack:      []routeDefinition{},
 		subRouter:       []routerBuilder{},
-		options:         false,
-		optionsIds:      &map[string]bool{},
+		options:         unset,
 	}
 
 	// Load options
@@ -124,8 +167,13 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 
 	// handle options, sitemap and all route
 	for _, route := range rb.routeStack {
-		if rb.options {
-			(*rb.optionsIds)[route.id] = true
+		ext, ok := getExtra(route.id)
+		if !ok {
+			return routerBuilder{}, fmt.Errorf("couldn't load id %d for route %s", route.id, route.pattern)
+		}
+		if ext.options == unset {
+			ext.options = rb.options
+			setExtra(route.id, ext)
 		}
 	}
 
@@ -135,7 +183,7 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 // WithRouter adds a subrouter to the current router
 func WithRouter(opts ...routerOption) routerOption {
 	return func(rb *routerBuilder) error {
-		router, err := initRouter(append(opts, transfer(rb.optionsIds))...)
+		router, err := initRouter(opts...)
 		if err != nil {
 			return err
 		}
@@ -166,29 +214,37 @@ func WithPrefix(prefix string) routerOption {
 // WithRoute adds a new route to the current router
 func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 	return func(rb *routerBuilder) error {
-		id, err := uuid.NewV7()
-		if err != nil {
-			return err
-		}
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
-				id:              id.String(),
+				id:              getCount(),
 				pattern:         pattern,
 				handler:         handler,
 				middlewareStack: []Middleware{},
 			},
 		)
+		setExtra(getCount(), routeExtra{options: unset, sitemap: unset})
+		nextSequence()
+
 		return nil
 	}
 }
 
 // WithOptions is adding if set to true a handler for OPTION method for every child
-// route created. You can deactivate this behaviour in child SubRouter by
-// setting it to false
+// route created. You can deactivate this behaviour in child SubRouters by
+// setting the active value to false
 func WithOptions(active bool) routerOption {
 	return func(rb *routerBuilder) error {
-		rb.options = active
+		rb.options = toTroolean(active)
+		return nil
+	}
+}
+
+// WithSitemap is adding all the child route to the sitemap. You can reverse this
+// behaviour in SubRouters by setting the active value to false
+func WithSitemap(active bool) routerOption {
+	return func(rb *routerBuilder) error {
+		rb.sitemap = toTroolean(active)
 		return nil
 	}
 }
