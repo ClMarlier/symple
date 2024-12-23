@@ -47,7 +47,7 @@ func requestContentType(cts []string) func(http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func WithRequestContentType(cts []ContentType) routerOption {
+func WithRequestContentType(cts ...ContentType) routerOption {
 	return func(rb *routerBuilder) error {
 		stringContentType := make([]string, 0, len(cts))
 		for _, ct := range cts {

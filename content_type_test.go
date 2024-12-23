@@ -55,7 +55,7 @@ func TestWithRequestContentType(t *testing.T) {
 	for _, val := range testTable {
 		t.Run(val.name, func(t *testing.T) {
 			mux, err := Router(
-				WithRequestContentType(val.contentTypes),
+				WithRequestContentType(val.contentTypes...),
 				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
 			)
 			if err != nil {
