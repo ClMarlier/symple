@@ -15,7 +15,7 @@ func nextSequence() {
 	sequenceState += 1
 }
 
-func getCount() int {
+func getSequence() int {
 	return sequenceState
 }
 
@@ -217,13 +217,13 @@ func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
-				id:              getCount(),
+				id:              getSequence(),
 				pattern:         pattern,
 				handler:         handler,
 				middlewareStack: []Middleware{},
 			},
 		)
-		setExtra(getCount(), routeExtra{options: unset, sitemap: unset})
+		setExtra(getSequence(), routeExtra{options: unset, sitemap: unset})
 		nextSequence()
 
 		return nil
