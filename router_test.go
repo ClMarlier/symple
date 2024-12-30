@@ -2,8 +2,10 @@ package symple
 
 import (
 	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 )
@@ -142,4 +144,34 @@ func TestWithOptionsPatternError(t *testing.T) {
 	if !strings.Contains(err.Error(), "malformated handler pattern") {
 		t.Fatalf("should return a malformated error patern, found: %s", err.Error())
 	}
+}
+
+func BenchmarkRouter(b *testing.B) {
+	sl := slog.NewJSONHandler(os.Stdout, nil)
+	mux, err := Router(
+		WithRouter(
+			WithStructLogger(sl),
+			WithRecoverer(true),
+			WithRoute("GET /benchmark", func(w http.ResponseWriter, r *http.Request) {
+				w.Write([]byte("ok"))
+			}),
+		),
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	req := httptest.NewRequest("GET", "/benchmark", bytes.NewReader([]byte("body")))
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			recorder := httptest.NewRecorder()
+			mux.ServeHTTP(recorder, req)
+			response := recorder.Result()
+			if response.StatusCode != 200 {
+				b.Fatal(err)
+			}
+		}
+	})
 }
