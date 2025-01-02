@@ -30,9 +30,13 @@ func TestRecoverer(t *testing.T) {
 		t.Run(val.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			req := httptest.NewRequest("POST", "/test", bytes.NewReader([]byte("body")))
-			mux, err := Router(
-				WithRecoverer(val.writeError),
-				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) { panic("error") }),
+
+			rs := NewRouter(ErrFuncDefault)
+			mux, err := rs.Router(
+				rs.WithRecoverer(val.writeError),
+				rs.WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) error {
+					panic("triggered error")
+				}),
 			)
 			if err != nil {
 				t.Fatal(err.Error())
@@ -46,8 +50,11 @@ func TestRecoverer(t *testing.T) {
 				t.Fatal(err.Error())
 			}
 
-			if (string(body) == "internal server error\n") != val.expectedResult {
-				t.Fatalf("wrong body: %s", string(body))
+			if string(body[:len(ErrInternalServer.Error())]) != ErrInternalServer.Error() {
+				t.Fatalf("wrong response body: %s", string(body))
+			}
+			if val.writeError && len(string(body)) == len(ErrInternalServer.Error())+1 {
+				t.Fatalf("missing stacktrace in the body: %s", string(body))
 			}
 		})
 	}

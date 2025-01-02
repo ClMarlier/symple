@@ -2,10 +2,8 @@ package symple
 
 import (
 	"bytes"
-	"log/slog"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"strings"
 	"testing"
 )
@@ -59,10 +57,11 @@ func TestRouter(t *testing.T) {
 		t.Run(val.name, func(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", val.requestPath, bytes.NewReader([]byte("body")))
-			mux, err := Router(
-				WithRouter(
-					WithPrefix(val.prefix),
-					WithRoute(val.path, func(w http.ResponseWriter, r *http.Request) {}),
+			rs := NewRouter(ErrFuncDefault)
+			mux, err := rs.Router(
+				rs.WithRouter(
+					rs.WithPrefix(val.prefix),
+					rs.WithRoute(val.path, func(w http.ResponseWriter, r *http.Request) error { return nil }),
 				),
 			)
 
@@ -84,18 +83,19 @@ func TestRouter(t *testing.T) {
 }
 
 func TestWithOptions(t *testing.T) {
-	mux1, err := Router(
-		WithOptions(true),
-		WithRoute("GET /test", func(w http.ResponseWriter, r *http.Request) {}),
-		WithRoute("PATCH /test", func(w http.ResponseWriter, r *http.Request) {}),
+	rs := NewRouter(ErrFuncDefault)
+	mux1, err := rs.Router(
+		rs.WithOptions(true),
+		rs.WithRoute("GET /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+		rs.WithRoute("PATCH /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 	)
 	if err != nil {
 		t.Fatalf("error building the mux %s", err.Error())
 	}
 
-	mux2, err := Router(
-		WithOptions(true),
-		WithRoute("/test", func(w http.ResponseWriter, r *http.Request) {}),
+	mux2, err := rs.Router(
+		rs.WithOptions(true),
+		rs.WithRoute("/test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 	)
 	if err != nil {
 		t.Fatalf("error building the mux %s", err.Error())
@@ -133,9 +133,10 @@ func TestWithOptions(t *testing.T) {
 }
 
 func TestWithOptionsPatternError(t *testing.T) {
-	_, err := Router(
-		WithOptions(true),
-		WithRoute("GET POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+	rs := NewRouter(ErrFuncDefault)
+	_, err := rs.Router(
+		rs.WithOptions(true),
+		rs.WithRoute("GET POST /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 	)
 	if err == nil {
 		t.Fatal("should return an error")
@@ -147,13 +148,13 @@ func TestWithOptionsPatternError(t *testing.T) {
 }
 
 func BenchmarkRouter(b *testing.B) {
-	sl := slog.NewJSONHandler(os.Stdout, nil)
-	mux, err := Router(
-		WithRouter(
-			WithStructLogger(sl),
-			WithRecoverer(true),
-			WithRoute("GET /benchmark", func(w http.ResponseWriter, r *http.Request) {
+	rs := NewRouter(ErrFuncDefault)
+	mux, err := rs.Router(
+		rs.WithRouter(
+			rs.WithRecoverer(true),
+			rs.WithRoute("GET /benchmark", func(w http.ResponseWriter, r *http.Request) error {
 				w.Write([]byte("ok"))
+				return nil
 			}),
 		),
 	)

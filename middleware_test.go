@@ -9,10 +9,10 @@ import (
 )
 
 func writeIdMiddleware(id string) Middleware {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) error {
 			w.Write([]byte(id))
-			next(w, r)
+			return next(w, r)
 		}
 	}
 }
@@ -40,20 +40,22 @@ func TestChainMiddleware(t *testing.T) {
 		},
 	}
 
-	dummyHandler := func(w http.ResponseWriter, r *http.Request) {}
-	mux, err := Router(
-		WithMiddleware(writeIdMiddleware("1")),
-		WithMiddleware(writeIdMiddleware("2")),
-		WithRoute("POST /test", dummyHandler),
-		WithRouter(
-			WithMiddleware(writeIdMiddleware("3")),
-			WithMiddleware(writeIdMiddleware("4")),
-			WithRoute("POST /nested_test1", dummyHandler),
+	dummyHandler := func(w http.ResponseWriter, r *http.Request) error { return nil }
+
+	rs := NewRouter(ErrFuncDefault)
+	mux, err := rs.Router(
+		rs.WithMiddleware(writeIdMiddleware("1")),
+		rs.WithMiddleware(writeIdMiddleware("2")),
+		rs.WithRoute("POST /test", dummyHandler),
+		rs.WithRouter(
+			rs.WithMiddleware(writeIdMiddleware("3")),
+			rs.WithMiddleware(writeIdMiddleware("4")),
+			rs.WithRoute("POST /nested_test1", dummyHandler),
 		),
-		WithRouter(
-			WithMiddleware(writeIdMiddleware("5")),
-			WithMiddleware(writeIdMiddleware("6")),
-			WithRoute("POST /nested_test2", dummyHandler),
+		rs.WithRouter(
+			rs.WithMiddleware(writeIdMiddleware("5")),
+			rs.WithMiddleware(writeIdMiddleware("6")),
+			rs.WithRoute("POST /nested_test2", dummyHandler),
 		),
 	)
 	if err != nil {

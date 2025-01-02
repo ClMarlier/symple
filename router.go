@@ -8,24 +8,35 @@ import (
 	"strings"
 )
 
-var sequenceState int = 0
-var extraState map[int]routeExtra = map[int]routeExtra{}
-
-func nextSequence() {
-	sequenceState += 1
+type routerState struct {
+	sequence         int
+	extra            map[int]routeExtra
+	errorHandlerFunc ErrorHandlerFunc
 }
 
-func getSequence() int {
-	return sequenceState
+func NewRouter(handler ErrorHandlerFunc) *routerState {
+	return &routerState{
+		sequence:         0,
+		extra:            make(map[int]routeExtra),
+		errorHandlerFunc: handler,
+	}
 }
 
-func getExtra(key int) (routeExtra, bool) {
-	val, ok := extraState[key]
+func (rs *routerState) nextSequence() {
+	rs.sequence += 1
+}
+
+func (rs *routerState) getSequence() int {
+	return rs.sequence
+}
+
+func (rs *routerState) getExtra(key int) (routeExtra, bool) {
+	val, ok := rs.extra[key]
 	return val, ok
 }
 
-func setExtra(key int, value routeExtra) {
-	extraState[key] = value
+func (rs *routerState) setExtra(key int, value routeExtra) {
+	rs.extra[key] = value
 }
 
 type troolean int
@@ -63,7 +74,7 @@ type routerOption func(*routerBuilder) error
 type routeDefinition struct {
 	id              int
 	pattern         string
-	handler         http.HandlerFunc
+	handler         HandlerFunc
 	middlewareStack []Middleware
 }
 
@@ -85,8 +96,8 @@ type routeDefinition struct {
 //   - WithRecoverer()
 //   - WithRequestContentType()
 //   - WithResponseContentType()
-func Router(opts ...routerOption) (*http.ServeMux, error) {
-	router, err := initRouter(opts...)
+func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
+	router, err := rs.initRouter(opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -95,9 +106,9 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 	options := make(map[string][]string)
 	sitemap := make([]string, 0)
 	for _, route := range router.routeStack {
-		mux.HandleFunc(route.pattern, chainMiddleware(route.handler, route.middlewareStack...))
+		mux.HandleFunc(route.pattern, rs.MakeHandlerFunc(chainMiddleware(route.handler, route.middlewareStack...)))
 
-		if val, ok := getExtra(route.id); ok {
+		if val, ok := rs.getExtra(route.id); ok {
 			path, methods, err := parsePattern(route.pattern)
 			if err != nil {
 				return nil, err
@@ -127,8 +138,8 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 	}
 
 	// Add handler with options methods to all registered routes
-	for key, value := range options {
-		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", key), optionHandler(value))
+	for path, methods := range options {
+		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", path), optionHandler(methods))
 	}
 
 	// Add sitemap.xml handler if needed
@@ -138,7 +149,7 @@ func Router(opts ...routerOption) (*http.ServeMux, error) {
 	return mux, nil
 }
 
-func initRouter(opts ...routerOption) (routerBuilder, error) {
+func (rs *routerState) initRouter(opts ...routerOption) (routerBuilder, error) {
 	rb := routerBuilder{
 		prefix:          "",
 		middlewareStack: []Middleware{},
@@ -167,13 +178,13 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 
 	// handle options, sitemap and all route
 	for _, route := range rb.routeStack {
-		ext, ok := getExtra(route.id)
+		ext, ok := rs.getExtra(route.id)
 		if !ok {
 			return routerBuilder{}, fmt.Errorf("couldn't load id %d for route %s", route.id, route.pattern)
 		}
 		if ext.options == unset {
 			ext.options = rb.options
-			setExtra(route.id, ext)
+			rs.setExtra(route.id, ext)
 		}
 	}
 
@@ -181,9 +192,9 @@ func initRouter(opts ...routerOption) (routerBuilder, error) {
 }
 
 // WithRouter adds a subrouter to the current router
-func WithRouter(opts ...routerOption) routerOption {
+func (rs *routerState) WithRouter(opts ...routerOption) routerOption {
 	return func(rb *routerBuilder) error {
-		router, err := initRouter(opts...)
+		router, err := rs.initRouter(opts...)
 		if err != nil {
 			return err
 		}
@@ -195,7 +206,7 @@ func WithRouter(opts ...routerOption) routerOption {
 
 // WithPrefix set the prefix path for the current router. Keep in mind that
 // the current router also inherit from all it's parents prefixes
-func WithPrefix(prefix string) routerOption {
+func (rs *routerState) WithPrefix(prefix string) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.prefix = fmt.Sprintf("%s%s", rb.prefix, prefix)
 		if prefix == "" {
@@ -212,19 +223,19 @@ func WithPrefix(prefix string) routerOption {
 }
 
 // WithRoute adds a new route to the current router
-func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
+func (rs *routerState) WithRoute(pattern string, handler HandlerFunc) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
-				id:              getSequence(),
+				id:              rs.getSequence(),
 				pattern:         pattern,
 				handler:         handler,
 				middlewareStack: []Middleware{},
 			},
 		)
-		setExtra(getSequence(), routeExtra{options: unset, sitemap: unset})
-		nextSequence()
+		rs.setExtra(rs.getSequence(), routeExtra{options: unset, sitemap: unset})
+		rs.nextSequence()
 
 		return nil
 	}
@@ -233,7 +244,7 @@ func WithRoute(pattern string, handler http.HandlerFunc) routerOption {
 // WithOptions is adding if set to true a handler for OPTION method for every child
 // route created. You can deactivate this behaviour in child SubRouters by
 // setting the active value to false
-func WithOptions(active bool) routerOption {
+func (rs *routerState) WithOptions(active bool) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.options = toTroolean(active)
 		return nil
@@ -242,7 +253,7 @@ func WithOptions(active bool) routerOption {
 
 // WithSitemap is adding all the child route to the sitemap. You can reverse this
 // behaviour in SubRouters by setting the active value to false
-func WithSitemap(active bool) routerOption {
+func (rs *routerState) WithSitemap(active bool) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.sitemap = toTroolean(active)
 		return nil
@@ -292,7 +303,7 @@ func parsePattern(pattern string) (string, []string, error) {
 	return "", []string{}, fmt.Errorf("malformated handler pattern %s", pattern)
 }
 
-func Startup() {
+func (rs *routerState) Startup() {
 	fmt.Println("")
 	fmt.Println("\033[0;30m\033[102m  ____                            _        \033[0m")
 	fmt.Println("\033[0;30m\033[102m / ___|  _   _  _ __ ___   _ __  | |  ___  \033[0m")

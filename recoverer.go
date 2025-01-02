@@ -6,40 +6,39 @@ import (
 	"runtime"
 )
 
-type recovererConfig struct {
-	writeError bool
-}
-
 // WithRecoverer handle gracefully any panic that could occur, if used after
 // WithStructLogger the error will be logged
-func WithRecoverer(writeError bool) routerOption {
+func (rs *routerState) WithRecoverer(writeError bool) routerOption {
 	return func(rb *routerBuilder) error {
-		config := &recovererConfig{writeError: writeError}
-		rb.middlewareStack = append(rb.middlewareStack, config.recoverer)
+		rb.middlewareStack = append(rb.middlewareStack, recoverer(writeError))
 		return nil
 	}
 }
 
-func (rc *recovererConfig) recoverer(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer func() {
-			if err := recover(); err != nil {
-				error := fmt.Errorf("%+v", err)
-				stack := make([]uintptr, 20)
-				n := runtime.Callers(1, stack)
-				stack = stack[:n]
-				frames := runtime.CallersFrames(stack)
-				frames.Next()
+func recoverer(writeError bool) func(HandlerFunc) HandlerFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) (err error) {
+			defer func() {
+				if recErr := recover(); recErr != nil {
+					if !writeError {
+						err = ErrInternalServer
+						return
+					} else {
+						err = fmt.Errorf("%+v", recErr)
+						stack := make([]uintptr, 20)
+						n := runtime.Callers(1, stack)
+						stack = stack[:n]
+						frames := runtime.CallersFrames(stack)
+						frames.Next()
 
-				for frame, more := frames.Next(); more; frame, more = frames.Next() {
-					error = fmt.Errorf("%s\n%v", frame.Function, error)
+						for frame, more := frames.Next(); more; frame, more = frames.Next() {
+							err = fmt.Errorf("%s\n%v", frame.Function, err)
+						}
+						err = fmt.Errorf("%w\n%w", ErrInternalServer, err)
+					}
 				}
-				if !rc.writeError {
-					error = fmt.Errorf("internal server error")
-				}
-				ErrorResponse(w, error, http.StatusInternalServerError)
-			}
-		}()
-		next(w, r)
+			}()
+			return next(w, r)
+		}
 	}
 }

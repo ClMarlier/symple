@@ -14,7 +14,8 @@ import (
 )
 
 func TestAuthJWT(t *testing.T) {
-	Startup()
+	rs := NewRouter(ErrFuncDefault)
+	rs.Startup()
 	validToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"iss": "symple",
 		"sub": "clement",
@@ -69,7 +70,7 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:               "missing secret",
 			authorization:      "",
-			withAuthJwt:        WithAuthJWT(WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "using AuthJWT with no secret is not allowed",
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedResponse:   "",
@@ -77,7 +78,7 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:               "without signing method",
 			authorization:      "",
-			withAuthJwt:        WithAuthJWT(WithSecret("1234")),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234")),
 			routerError:        "using AuthJWT with no signing method is not allowed",
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedResponse:   "",
@@ -85,10 +86,10 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:          "with duplicate signign method",
 			authorization: "wrong",
-			withAuthJwt: WithAuthJWT(
-				WithSecret("1234"),
-				WithSigningMethod(jwt.SigningMethodHS256),
-				WithSigningMethod(jwt.SigningMethodHS256),
+			withAuthJwt: rs.WithAuthJWT(
+				rs.WithSecret("1234"),
+				rs.WithSigningMethod(jwt.SigningMethodHS256),
+				rs.WithSigningMethod(jwt.SigningMethodHS256),
 			),
 			routerError:        "duplicate signing method",
 			expectedStatusCode: http.StatusUnauthorized,
@@ -97,7 +98,7 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:               "unauthorized",
 			authorization:      "wrong",
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
 			expectedResponse:   "",
@@ -105,7 +106,7 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:               "authorized",
 			authorization:      fmt.Sprintf("Bearer %s", validTokenString),
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusOK,
 			expectedResponse:   "clement",
@@ -113,42 +114,42 @@ func TestAuthJWT(t *testing.T) {
 		{
 			name:               "missing auth header",
 			authorization:      "",
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "missing authorization header",
+			expectedResponse:   "unauthorized missing authorization header",
 		},
 		{
 			name:               "not a Bearer token",
 			authorization:      fmt.Sprintf("NotBearer %s", expiredTokenString),
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "the authorization header should be a Bearer",
+			expectedResponse:   "unauthorized the authorization header should be a Bearer",
 		},
 		{
 			name:               "expired",
 			authorization:      fmt.Sprintf("Bearer %s", expiredTokenString),
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "token has invalid claims: token is expired",
+			expectedResponse:   "unauthorized token has invalid claims: token is expired",
 		},
 		{
 			name:               "wrong signing method",
 			authorization:      fmt.Sprintf("Bearer %s", wrongMethodTokenString),
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "token signature is invalid: signing method",
+			expectedResponse:   "unauthorized token signature is invalid: signing method",
 		},
 		{
 			name:               "no sub token",
 			authorization:      fmt.Sprintf("Bearer %s", noSubTokenString),
-			withAuthJwt:        WithAuthJWT(WithSecret("1234"), WithSigningMethod(jwt.SigningMethodHS256)),
+			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "'sub' claim is invalid",
+			expectedResponse:   "unauthorized 'sub' claim is invalid",
 		},
 	}
 
@@ -159,11 +160,11 @@ func TestAuthJWT(t *testing.T) {
 			if val.authorization != "" {
 				req.Header.Set("Authorization", val.authorization)
 			}
-			mux, err := Router(
+			mux, err := rs.Router(
 				val.withAuthJwt,
-				WithRoute(
+				rs.WithRoute(
 					"POST /test",
-					func(w http.ResponseWriter, r *http.Request) {
+					func(w http.ResponseWriter, r *http.Request) error {
 						sub, ok := r.Context().Value(tokenSub{}).(string)
 						if !ok {
 							ErrorResponse(
@@ -172,6 +173,7 @@ func TestAuthJWT(t *testing.T) {
 								http.StatusInternalServerError)
 						}
 						w.Write([]byte(sub))
+						return nil
 					}),
 			)
 			if err != nil {

@@ -3,8 +3,6 @@ package symple
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
-	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -19,78 +17,43 @@ type Body struct {
 }
 
 type logEntry struct {
-	Time   string  `json:"time"`
-	Level  string  `json:"level"`
-	Msg    string  `json:"msg"`
-	Status int     `json:"status"`
-	Method string  `json:"method"`
-	Path   string  `json:"path"`
-	Body   Body    `json:"body"`
-	User   *string `json:"user"`
-	Error  string  `json:"error"`
+	Time      string `json:"time"`
+	Level     string `json:"level"`
+	Verb      string `json:"verb"`
+	Path      string `json:"path"`
+	ErrorDesc string `json:"desc"`
 }
 
 func TestWithStructLogger(t *testing.T) {
+	body := Body{Name: []string{"clement"}, Age: []string{"99"}}
 	testTable := []struct {
 		name           string
 		cType          string
-		body           Body
 		responseStatus int
-		writeBody      bool
-		error          string
-		panic          string
+		error          error
 	}{
 		{
-			name:           "succes json",
+			name:           "log info success",
 			cType:          "json",
-			body:           Body{Name: []string{"clement"}, Age: []string{"99"}},
-			responseStatus: http.StatusOK,
-			writeBody:      true,
-			error:          "",
-			panic:          "",
+			responseStatus: 200,
+			error:          nil,
 		},
 		{
-			name:           "error form-url-encoded",
-			cType:          "form-encoded",
-			body:           Body{Name: []string{"clement"}, Age: []string{"99"}},
-			responseStatus: http.StatusUnprocessableEntity,
-			writeBody:      true,
-			error:          "error from http handler",
-			panic:          "",
-		},
-		{
-			name:           "panic multipart/form-data",
-			cType:          "multipart",
-			body:           Body{Name: []string{"clement"}, Age: []string{"99"}},
-			responseStatus: http.StatusInternalServerError,
-			writeBody:      true,
-			error:          "",
-			panic:          "panic from http handler",
-		},
-		{
-			name:           "succes bad content type",
-			cType:          "none",
-			body:           Body{Name: []string{"clement"}, Age: []string{"99"}},
-			responseStatus: http.StatusOK,
-			writeBody:      true,
-			error:          "",
-			panic:          "",
+			name:           "first",
+			cType:          "json",
+			responseStatus: 401,
+			error:          ErrUnauthorized,
 		},
 	}
 
 	for _, val := range testTable {
 		var buf bytes.Buffer
-		handler := slog.NewJSONHandler(&buf, nil)
-		mux, err := Router(
-			WithStructLogger(handler),
-			WithRecoverer(val.writeBody),
-			WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {
-				if val.error != "" {
-					ErrorResponse(w, fmt.Errorf(val.error), http.StatusUnprocessableEntity)
-				}
-				if val.panic != "" {
-					panic(val.panic)
-				}
+		rs := NewRouter(ErrFuncDefault)
+		mux, err := rs.Router(
+			rs.WithZeroLog(&buf),
+			rs.WithRecoverer(false),
+			rs.WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) error {
+				return val.error
 			}),
 		)
 		if err != nil {
@@ -101,7 +64,7 @@ func TestWithStructLogger(t *testing.T) {
 			recorder := httptest.NewRecorder()
 			switch val.cType {
 			case "json":
-				byteBody, err := json.Marshal(val.body)
+				byteBody, err := json.Marshal(body)
 				if err != nil {
 					t.Fatal(err.Error())
 				}
@@ -110,8 +73,8 @@ func TestWithStructLogger(t *testing.T) {
 				mux.ServeHTTP(recorder, req)
 			case "form-encoded":
 				form := url.Values{}
-				form.Add("name", val.body.Name[0])
-				form.Add("age", val.body.Age[0])
+				form.Add("name", body.Name[0])
+				form.Add("age", body.Age[0])
 				req := httptest.NewRequest("POST", "/test", strings.NewReader(form.Encode()))
 				req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 				mux.ServeHTTP(recorder, req)
@@ -131,7 +94,7 @@ func TestWithStructLogger(t *testing.T) {
 				req.Header.Add("Content-Type", writer.FormDataContentType())
 				mux.ServeHTTP(recorder, req)
 			default:
-				byteBody, err := json.Marshal(val.body)
+				byteBody, err := json.Marshal(body)
 				if err != nil {
 					t.Fatal(err.Error())
 				}
@@ -149,23 +112,18 @@ func TestWithStructLogger(t *testing.T) {
 			if err != nil {
 				t.Fatal(err.Error())
 			}
-			if val.cType != "none" {
-				if val.body.Name[0] != decodedLog.Body.Name[0] {
-					t.Fatalf("wrong body logged, expecting %#v found %#v", val.body, decodedLog.Body)
-				}
-				if val.body.Age[0] != decodedLog.Body.Age[0] {
-					t.Fatalf("wrong body logged, expecting %#v found %#v", val.body, decodedLog.Body)
+
+			if val.error == nil {
+				if decodedLog.Level != "info" {
+					t.Fatalf("level should be info when no error, %s found", decodedLog.Level)
 				}
 			} else {
-				if len(decodedLog.Body.Name) != 0 || len(decodedLog.Body.Age) != 0 {
-					t.Fatalf("the body should'nt be logged, found %#v", decodedLog.Body)
+				if decodedLog.Level != "error" {
+					t.Fatalf("level should be error when there is an error, %s found", decodedLog.Level)
 				}
-			}
-			if val.error != "" && !strings.HasPrefix(decodedLog.Error, val.error) {
-				t.Fatalf("wrong error value expecting %s, found %s", val.error, decodedLog.Error)
-			}
-			if val.panic != "" && !strings.Contains(decodedLog.Error, val.panic) {
-				t.Fatalf("wrong error value expecting %s, found %s", val.panic, decodedLog.Error)
+				if decodedLog.ErrorDesc != val.error.Error() {
+					t.Fatalf("invalid error type found %s, %s expected", decodedLog.ErrorDesc, val.error.Error())
+				}
 			}
 		})
 	}

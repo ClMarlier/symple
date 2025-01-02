@@ -112,7 +112,7 @@ func CacheFileSystem(path string) (http.FileSystem, error) {
 
 // Be carefull that tralling slash is automaticaly added to the pattern so do not
 // add one.
-func WithCacheFileServer(path string, pattern string, cacheControl string, expire time.Duration) routerOption {
+func (rs *routerState) WithCacheFileServer(path string, pattern string, cacheControl string, expire time.Duration) routerOption {
 	return func(rb *routerBuilder) error {
 		cacheFS, err := CacheFileSystem(path)
 		if err != nil {
@@ -121,24 +121,25 @@ func WithCacheFileServer(path string, pattern string, cacheControl string, expir
 		rb.routeStack = append(
 			rb.routeStack,
 			routeDefinition{
-				id:              getSequence(),
+				id:              rs.getSequence(),
 				pattern:         fmt.Sprintf("GET %s/", pattern),
 				handler:         fileServerWithCacheControl(http.FileServer(cacheFS), cacheControl, expire),
 				middlewareStack: []Middleware{},
 			},
 		)
-		setExtra(getSequence(), routeExtra{options: unset, sitemap: unset})
-		nextSequence()
+		rs.setExtra(rs.getSequence(), routeExtra{options: unset, sitemap: unset})
+		rs.nextSequence()
 		return nil
 	}
 }
 
-func fileServerWithCacheControl(fsFunc http.Handler, cacheControl string, expire time.Duration) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+func fileServerWithCacheControl(fsFunc http.Handler, cacheControl string, expire time.Duration) HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Set("Cache-Control", cacheControl)
 		w.Header().Set("Expires", time.Now().Add(expire).Format(http.TimeFormat))
 		w.Header().Set("ETag", fmt.Sprintf(`"%d"`, time.Now().Unix()))
 
 		fsFunc.ServeHTTP(w, r)
+		return nil
 	}
 }

@@ -54,9 +54,10 @@ func TestWithRequestContentType(t *testing.T) {
 	}
 	for _, val := range testTable {
 		t.Run(val.name, func(t *testing.T) {
-			mux, err := Router(
-				WithRequestContentType(val.contentTypes...),
-				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+			rs := NewRouter(ErrFuncDefault)
+			mux, err := rs.Router(
+				rs.WithRequestContentType(val.contentTypes...),
+				rs.WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 			)
 			if err != nil {
 				if strings.Contains(err.Error(), val.error) {
@@ -92,9 +93,10 @@ func TestWithResponseContentType(t *testing.T) {
 	}
 	for _, val := range testTable {
 		t.Run(val.name, func(t *testing.T) {
-			mux, err := Router(
-				WithResponseContentType(val.contentType),
-				WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) {}),
+			rs := NewRouter(ErrFuncDefault)
+			mux, err := rs.Router(
+				rs.WithResponseContentType(val.contentType),
+				rs.WithRoute("POST /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 			)
 			if err != nil {
 				if strings.Contains(err.Error(), val.error) {

@@ -43,10 +43,16 @@ func TestCacheFileserver(t *testing.T) {
 			if err != nil {
 				t.Fatalf("CacheFileSystem initialization error: %s", err)
 			}
+			rs := NewRouter(ErrFuncDefault)
 			req := httptest.NewRequest("GET", val.path, bytes.NewReader([]byte("body")))
-			mux, err := Router(
-				WithRouter(
-					WithRoute("/", http.FileServer(cache).ServeHTTP),
+			mux, err := rs.Router(
+				rs.WithRouter(
+					rs.WithRoute("/",
+						func(w http.ResponseWriter, r *http.Request) error {
+							http.FileServer(cache).ServeHTTP(w, r)
+							return nil
+						},
+					),
 				),
 			)
 

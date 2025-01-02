@@ -6,14 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
-func WithStructLogger(sl slog.Handler) routerOption {
+func (rs *routerState) WithZeroLog(w io.Writer) routerOption {
 	return func(rb *routerBuilder) error {
-		config := &LoggerConfig{
-			Log: slog.New(sl),
-		}
-		rb.middlewareStack = append(rb.middlewareStack, config.sLogger)
+		logger := zerolog.New(w) //.Output(zerolog.ConsoleWriter{Out: w})
+		rb.middlewareStack = append(rb.middlewareStack, loggerMiddleware(&logger))
 		return nil
 	}
 }
@@ -22,7 +22,33 @@ type LoggerConfig struct {
 	Log *slog.Logger
 }
 
-func (lg *LoggerConfig) sLogger(next http.HandlerFunc) http.HandlerFunc {
+func loggerMiddleware(logger *zerolog.Logger) func(HandlerFunc) HandlerFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) error {
+			start := time.Now()
+			// user := r.Context().Value(tokenSub{})
+			// body := getRequestBody(r)
+
+			err := next(w, r)
+			var event *zerolog.Event
+			if err != nil {
+				event = logger.Error().Str("desc", err.Error())
+			} else {
+				event = logger.Info()
+			}
+			event.
+				Str("verb", r.Method).
+				Str("path", r.URL.Path).
+				Str("time", time.Since(start).String()).
+				// Any("user", user).
+				// Any("body", body). // Only on internal server error to reduce allocs
+				Send()
+			return err
+		}
+	}
+}
+
+func (lg *LoggerConfig) loggerMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		user := r.Context().Value(tokenSub{})

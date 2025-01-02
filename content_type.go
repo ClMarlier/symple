@@ -26,28 +26,21 @@ func getContentType(r *http.Request) string {
 	return contentType
 }
 
-func requestContentType(cts []string) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+func requestContentType(cts []string) func(HandlerFunc) HandlerFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) error {
 			if r.ContentLength != 0 {
 				contentType := getContentType(r)
 				if !slices.Contains(cts, contentType) {
-					ErrorResponse(
-						w,
-						fmt.Errorf(
-							"invalid Content-Type, found %s, wanted %s",
-							contentType,
-							strings.Join(cts, ", ")),
-						http.StatusUnsupportedMediaType)
-					return
+					return fmt.Errorf("%w invalid Content-Type, found %s, wanted %s", ErrUnsuportedMedia, contentType, strings.Join(cts, " or "))
 				}
 			}
-			next(w, r)
+			return next(w, r)
 		}
 	}
 }
 
-func WithRequestContentType(cts ...ContentType) routerOption {
+func (rs *routerState) WithRequestContentType(cts ...ContentType) routerOption {
 	return func(rb *routerBuilder) error {
 		stringContentType := make([]string, 0, len(cts))
 		for _, ct := range cts {
@@ -63,16 +56,16 @@ func WithRequestContentType(cts ...ContentType) routerOption {
 	}
 }
 
-func responseContentType(ct ContentType) func(http.HandlerFunc) http.HandlerFunc {
-	return func(next http.HandlerFunc) http.HandlerFunc {
-		return func(w http.ResponseWriter, r *http.Request) {
+func responseContentType(ct ContentType) func(HandlerFunc) HandlerFunc {
+	return func(next HandlerFunc) HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) error {
 			w.Header().Add("Content-Type", string(ct))
-			next(w, r)
+			return next(w, r)
 		}
 	}
 }
 
-func WithResponseContentType(ct ContentType) routerOption {
+func (rs *routerState) WithResponseContentType(ct ContentType) routerOption {
 	return func(rb *routerBuilder) error {
 		rb.middlewareStack = append(rb.middlewareStack, responseContentType(ct))
 		return nil
