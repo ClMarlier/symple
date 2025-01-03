@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 type Body struct {
@@ -124,6 +125,15 @@ func TestWithStructLogger(t *testing.T) {
 				if decodedLog.ErrorDesc != val.error.Error() {
 					t.Fatalf("invalid error type found %s, %s expected", decodedLog.ErrorDesc, val.error.Error())
 				}
+			}
+			if decodedLog.Verb != "POST" {
+				t.Fatalf("invalid http verb logger POST expected, %s found", decodedLog.Verb)
+			}
+			if _, err := time.ParseDuration(decodedLog.Time); err != nil {
+				t.Fatalf("invalid time duration %s", decodedLog.Time)
+			}
+			if decodedLog.Path != "/test" {
+				t.Fatalf("invalid path value found %s, /test expected", decodedLog.Path)
 			}
 		})
 	}
