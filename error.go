@@ -8,10 +8,11 @@ import (
 //TODO wrap error with a custom struct to add Status() func and avoid the switch statement
 
 var (
-	ErrUnauthorized    = errors.New("unauthorized")
-	ErrUnsuportedMedia = errors.New("unsupported media type")
-	ErrInternalServer  = errors.New("internal server error")
-	ErrNotFound        = errors.New("ressource not found")
+	ErrUnauthorized        = errors.New("unauthorized")
+	ErrNotFound            = errors.New("ressource not found")
+	ErrUnsuportedMedia     = errors.New("unsupported media type")
+	ErrUnprocessableEntity = errors.New("unprocessable entiy")
+	ErrInternalServer      = errors.New("internal server error")
 )
 
 func ErrFuncDefault(w http.ResponseWriter, r *http.Request, err error) {
@@ -29,6 +30,8 @@ func errorStatusCode(err error) int {
 		return http.StatusUnauthorized
 	case errors.Is(err, ErrUnsuportedMedia):
 		return http.StatusUnsupportedMediaType
+	case errors.Is(err, ErrUnprocessableEntity):
+		return http.StatusUnprocessableEntity
 	case errors.Is(err, ErrInternalServer):
 		return http.StatusInternalServerError
 	default:
