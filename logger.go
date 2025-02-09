@@ -3,7 +3,6 @@ package symple
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"time"
 
@@ -18,17 +17,10 @@ func (rs *routerState) WithZeroLog(w io.Writer) routerOption {
 	}
 }
 
-type LoggerConfig struct {
-	Log *slog.Logger
-}
-
 func loggerMiddleware(logger *zerolog.Logger) func(HandlerFunc) HandlerFunc {
 	return func(next HandlerFunc) HandlerFunc {
 		return func(w http.ResponseWriter, r *http.Request) error {
 			start := time.Now()
-			// user := r.Context().Value(tokenSub{})
-			// body := getRequestBody(r)
-
 			err := next(w, r)
 			var event *zerolog.Event
 			if err != nil {
@@ -40,47 +32,8 @@ func loggerMiddleware(logger *zerolog.Logger) func(HandlerFunc) HandlerFunc {
 				Str("verb", r.Method).
 				Str("path", r.URL.Path).
 				Str("time", time.Since(start).String()).
-				// Any("user", user).
-				// Any("body", body). // Only on internal server error to reduce allocs
 				Send()
 			return err
-		}
-	}
-}
-
-func (lg *LoggerConfig) loggerMiddleware(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		user := r.Context().Value(tokenSub{})
-
-		next(w, r)
-
-		tracker, ok := w.(*trackWriter)
-		if ok {
-			if tracker.error == nil && lg.Log.Enabled(r.Context(), slog.LevelInfo) {
-				body := getRequestBody(r)
-				lg.Log.Info(
-					"",
-					"status", tracker.statusCode,
-					"method", r.Method,
-					"path", r.URL.Path,
-					"body", body,
-					"user", user,
-					"duration", time.Since(start).String(),
-				)
-			} else if tracker.error != nil {
-				body := getRequestBody(r)
-				lg.Log.Error(
-					"",
-					"status", tracker.statusCode,
-					"method", r.Method,
-					"path", r.URL.Path,
-					"body", body,
-					"user", user,
-					"duration", time.Since(start).String(),
-					"error", tracker.error,
-				)
-			}
 		}
 	}
 }

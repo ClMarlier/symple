@@ -1,6 +1,7 @@
 package symple
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -42,11 +43,11 @@ func (cf cacheFile) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekEnd:
 		newPos = int64(len(cf.data)) + offset
 	default:
-		return 0, fmt.Errorf("invalid whence value")
+		return 0, errors.New("invalid whence value")
 	}
 
 	if newPos < 0 || newPos > int64(len(cf.data)) {
-		return 0, fmt.Errorf("seek out of range")
+		return 0, errors.New("seek out of range")
 	}
 
 	*cf.pos = newPos
