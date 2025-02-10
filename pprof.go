@@ -78,7 +78,7 @@ func (rs *routerState) WithPprof() routerOption {
 					middlewareStack: []Middleware{},
 				},
 			)
-			rs.setExtra(rs.getSequence(), routeExtra{options: unset, sitemap: unset})
+			rs.setExtra(rs.getSequence(), routeExtra{options: setBool{}, sitemap: setBool{}})
 			rs.nextSequence()
 		}
 		return nil

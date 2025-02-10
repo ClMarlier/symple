@@ -39,25 +39,14 @@ func (rs *routerState) setExtra(key int, value routeExtra) {
 	rs.extra[key] = value
 }
 
-type troolean int
-
-const (
-	unset troolean = iota
-	triFalse
-	triTrue
-)
-
-func toTroolean(b bool) troolean {
-	if b {
-		return triTrue
-	} else {
-		return triFalse
-	}
+type setBool struct {
+	isSet bool
+	value bool
 }
 
 type routeExtra struct {
-	options troolean
-	sitemap troolean
+	options setBool
+	sitemap setBool
 }
 
 type routerBuilder struct {
@@ -65,8 +54,8 @@ type routerBuilder struct {
 	middlewareStack []Middleware
 	routeStack      []routeDefinition
 	subRouter       []routerBuilder
-	options         troolean
-	sitemap         troolean
+	options         setBool
+	sitemap         setBool
 }
 
 type routerOption func(*routerBuilder) error
@@ -114,8 +103,7 @@ func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
 				return nil, err
 			}
 
-			if val.options == triTrue {
-
+			if val.options.value {
 				var nextMethods []string = []string{}
 				if val, ok := options[path]; ok {
 					nextMethods = val
@@ -129,7 +117,7 @@ func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
 				options[path] = nextMethods
 			}
 
-			if val.sitemap == triTrue {
+			if val.sitemap.value {
 				if !slices.Contains(sitemap, path) {
 					sitemap = append(sitemap, path)
 				}
@@ -155,7 +143,7 @@ func (rs *routerState) initRouter(opts ...routerOption) (routerBuilder, error) {
 		middlewareStack: []Middleware{},
 		routeStack:      []routeDefinition{},
 		subRouter:       []routerBuilder{},
-		options:         unset,
+		options:         setBool{},
 	}
 
 	// Load options
@@ -182,7 +170,7 @@ func (rs *routerState) initRouter(opts ...routerOption) (routerBuilder, error) {
 		if !ok {
 			return routerBuilder{}, fmt.Errorf("couldn't load id %d for route %s", route.id, route.pattern)
 		}
-		if ext.options == unset {
+		if !ext.options.isSet {
 			ext.options = rb.options
 			rs.setExtra(route.id, ext)
 		}
@@ -234,7 +222,7 @@ func (rs *routerState) WithRoute(pattern string, handler HandlerFunc) routerOpti
 				middlewareStack: []Middleware{},
 			},
 		)
-		rs.setExtra(rs.getSequence(), routeExtra{options: unset, sitemap: unset})
+		rs.setExtra(rs.getSequence(), routeExtra{options: setBool{}, sitemap: setBool{}})
 		rs.nextSequence()
 
 		return nil
@@ -246,7 +234,7 @@ func (rs *routerState) WithRoute(pattern string, handler HandlerFunc) routerOpti
 // setting the active value to false
 func (rs *routerState) WithOptions(active bool) routerOption {
 	return func(rb *routerBuilder) error {
-		rb.options = toTroolean(active)
+		rb.options = setBool{isSet: true, value: active}
 		return nil
 	}
 }
@@ -255,7 +243,7 @@ func (rs *routerState) WithOptions(active bool) routerOption {
 // behaviour in SubRouters by setting the active value to false
 func (rs *routerState) WithSitemap(active bool) routerOption {
 	return func(rb *routerBuilder) error {
-		rb.sitemap = toTroolean(active)
+		rb.sitemap = setBool{isSet: true, value: active}
 		return nil
 	}
 }
