@@ -128,7 +128,7 @@ func (rs *routerState) WithCacheFileServer(path string, pattern string, cacheCon
 				middlewareStack: []Middleware{},
 			},
 		)
-		rs.setExtra(rs.getSequence(), routeExtra{options: unset, sitemap: unset})
+		rs.setExtra(rs.getSequence(), routeExtra{options: setBool{}, sitemap: setBool{}})
 		rs.nextSequence()
 		return nil
 	}

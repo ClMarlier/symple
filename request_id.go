@@ -19,7 +19,6 @@ func requestIdMiddleware(next HandlerFunc) HandlerFunc {
 		if err != nil {
 			return err
 		}
-		// r.Header.Set("X-Request-Id", "sdfdsf") //concurent issue
 		w.Header().Set("X-Request-Id", rid.String())
 		return next(w, r)
 	}

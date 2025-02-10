@@ -152,6 +152,7 @@ func BenchmarkRouter(b *testing.B) {
 	mux, err := rs.Router(
 		rs.WithRouter(
 			rs.WithRecoverer(true),
+			rs.WithRequestId(),
 			rs.WithRoute("GET /benchmark", func(w http.ResponseWriter, r *http.Request) error {
 				w.Write([]byte("ok"))
 				return nil
@@ -161,17 +162,18 @@ func BenchmarkRouter(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+
+	req := httptest.NewRequest("GET", "/benchmark", nil)
 	b.ReportAllocs()
 	b.ResetTimer()
 
-	req := httptest.NewRequest("GET", "/benchmark", bytes.NewReader([]byte("body")))
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
 			recorder := httptest.NewRecorder()
 			mux.ServeHTTP(recorder, req)
 			response := recorder.Result()
 			if response.StatusCode != 200 {
-				b.Fatal(err)
+				b.Fatal(response.StatusCode)
 			}
 		}
 	})
