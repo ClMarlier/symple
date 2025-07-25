@@ -57,7 +57,7 @@ func panicError(w http.ResponseWriter, r *http.Request) error {
         pathNumber := r.PathValue("n")
         n, err := strconv.ParseInt(pathNumber, 10, 32)
         if err != nil {
-                symple.ErrorResponse(w, err, http.StatusUnprocessableEntity)
+                http.Error(w, err.Error(), http.StatusUnprocessableEntity)
         }
         res := 666 / n
         _, err = w.Write([]byte(fmt.Sprintf("666/%d = %d", n, res)))

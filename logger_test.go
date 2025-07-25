@@ -25,7 +25,7 @@ type logEntry struct {
 	ErrorDesc string `json:"desc"`
 }
 
-func TestWithStructLogger(t *testing.T) {
+func TestWithZeroLog(t *testing.T) {
 	body := Body{Name: []string{"clement"}, Age: []string{"99"}}
 	testTable := []struct {
 		name           string
@@ -36,13 +36,13 @@ func TestWithStructLogger(t *testing.T) {
 		{
 			name:           "log info success",
 			cType:          "json",
-			responseStatus: 200,
+			responseStatus: http.StatusOK,
 			error:          nil,
 		},
 		{
 			name:           "first",
 			cType:          "json",
-			responseStatus: 401,
+			responseStatus: http.StatusUnauthorized,
 			error:          ErrUnauthorized,
 		},
 	}
@@ -106,7 +106,7 @@ func TestWithStructLogger(t *testing.T) {
 
 			res := recorder.Result()
 			if res.StatusCode != val.responseStatus {
-				t.Fatalf("Wrong status code 200 expected, %d found", res.StatusCode)
+				t.Fatalf("Wrong status code %d expected, %d found", res.StatusCode, val.responseStatus)
 			}
 			var decodedLog logEntry
 			json.Unmarshal(buf.Bytes(), &decodedLog)
