@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestCacheFileserver(t *testing.T) {
@@ -79,6 +81,46 @@ func TestCacheFileserver(t *testing.T) {
 			resSha := base64.URLEncoding.EncodeToString(h.Sum(nil))
 			if originalSha != resSha {
 				t.Fatalf("body received do not match with the original file")
+			}
+		})
+	}
+}
+
+func TestWithCacheFileServer(t *testing.T) {
+	testTable := []struct {
+		name           string
+		filename       string
+		expectedStatus int
+	}{
+		{
+			name:           "existing file",
+			filename:       "cache_file_server_test_file.txt",
+			expectedStatus: http.StatusOK,
+		},
+		{
+			name:           "file not found",
+			filename:       "god.txt",
+			expectedStatus: http.StatusNotFound,
+		},
+	}
+	for _, val := range testTable {
+		t.Run(val.name, func(t *testing.T) {
+			rs := NewRouter(ErrFuncDefault)
+
+			mux, err := rs.Router(
+				rs.WithCacheFileServer("./", "/", "public, max-age=2592000", time.Hour),
+			)
+			if err != nil {
+				t.Fatalf(err.Error())
+			}
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", fmt.Sprintf("/%s", val.filename), nil)
+			mux.ServeHTTP(recorder, req)
+
+			res := recorder.Result()
+
+			if res.StatusCode != val.expectedStatus {
+				t.Fatalf("Invalid status values: %d, expected %d", res.StatusCode, val.expectedStatus)
 			}
 		})
 	}

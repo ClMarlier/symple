@@ -32,7 +32,7 @@ func requestContentType(cts []string) func(HandlerFunc) HandlerFunc {
 			if r.ContentLength != 0 {
 				contentType := getContentType(r)
 				if !slices.Contains(cts, contentType) {
-					return fmt.Errorf("%w invalid Content-Type, found %s, wanted %s", ErrUnsuportedMedia, contentType, strings.Join(cts, " or "))
+					return fmt.Errorf("%w invalid Content-Type, found %s, wanted %s", ErrUnsupportedMediaType, contentType, strings.Join(cts, " or "))
 				}
 			}
 			return next(w, r)

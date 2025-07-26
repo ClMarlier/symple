@@ -1,7 +1,6 @@
 package symple
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"time"
@@ -36,37 +35,4 @@ func loggerMiddleware(logger *zerolog.Logger) func(HandlerFunc) HandlerFunc {
 			return err
 		}
 	}
-}
-
-func getRequestBody(r *http.Request) map[string]interface{} {
-	body := make(map[string]interface{})
-	contentType := getContentType(r)
-	switch contentType {
-	case "application/json":
-		data, err := io.ReadAll(r.Body)
-		if err == nil {
-			json.Unmarshal(data, &body)
-		}
-		return body
-	case "multipart/form-data":
-		if err := r.ParseMultipartForm(32 << 20); err == nil {
-			for key, values := range r.MultipartForm.Value {
-				if len(values) > 0 {
-					body[key] = values
-				}
-			}
-		}
-		return body
-	case "application/x-www-form-urlencoded":
-		if err := r.ParseForm(); err == nil {
-			for key, values := range r.Form {
-				if len(values) > 0 {
-					body[key] = values
-				}
-			}
-		}
-		return body
-	}
-	return body
-
 }

@@ -80,11 +80,13 @@ type routeDefinition struct {
 // Available middleware:
 //
 //   - WithAuthJWT()
-//   - WithStructLogger()
+//   - WithCacheFileServer()
 //   - WithMiddleware()
+//   - WithPprof()
 //   - WithRecoverer()
 //   - WithRequestContentType()
 //   - WithResponseContentType()
+//   - WithZeroLog()
 func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
 	router, err := rs.initRouter(opts...)
 	if err != nil {

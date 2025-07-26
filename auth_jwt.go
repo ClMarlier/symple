@@ -96,7 +96,7 @@ func (ac *authJwtConfig) authJWT(next HandlerFunc) HandlerFunc {
 		}
 		sub, err := subFromToken(splitedTokenString[1], ac.secret, ac.methods)
 		if err != nil {
-			return fmt.Errorf("%w %w", ErrUnauthorized, err)
+			return fmt.Errorf("%w %s", ErrUnauthorized, err.Error())
 		} else if sub != "" {
 			ctx := context.WithValue(r.Context(), tokenSub{}, sub)
 			r = r.WithContext(ctx)

@@ -115,6 +115,9 @@ func CacheFileSystem(path string) (http.FileSystem, error) {
 // add one.
 func (rs *routerState) WithCacheFileServer(path string, pattern string, cacheControl string, expire time.Duration) routerOption {
 	return func(rb *routerBuilder) error {
+		if pattern == "/" {
+			pattern = ""
+		}
 		cacheFS, err := CacheFileSystem(path)
 		if err != nil {
 			return err

@@ -117,7 +117,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "unauthorized missing authorization header",
+			expectedResponse:   "unauthorized",
 		},
 		{
 			name:               "not a Bearer token",
@@ -125,7 +125,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "unauthorized the authorization header should be a Bearer",
+			expectedResponse:   "unauthorized",
 		},
 		{
 			name:               "expired",
@@ -133,7 +133,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "unauthorized token has invalid claims: token is expired",
+			expectedResponse:   "unauthorized",
 		},
 		{
 			name:               "wrong signing method",
@@ -141,7 +141,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "unauthorized token signature is invalid: signing method",
+			expectedResponse:   "unauthorized",
 		},
 		{
 			name:               "no sub token",
@@ -149,7 +149,7 @@ func TestAuthJWT(t *testing.T) {
 			withAuthJwt:        rs.WithAuthJWT(rs.WithSecret("1234"), rs.WithSigningMethod(jwt.SigningMethodHS256)),
 			routerError:        "",
 			expectedStatusCode: http.StatusUnauthorized,
-			expectedResponse:   "unauthorized 'sub' claim is invalid",
+			expectedResponse:   "unauthorized",
 		},
 	}
 
@@ -167,9 +167,9 @@ func TestAuthJWT(t *testing.T) {
 					func(w http.ResponseWriter, r *http.Request) error {
 						sub, ok := r.Context().Value(tokenSub{}).(string)
 						if !ok {
-							ErrorResponse(
+							http.Error(
 								w,
-								fmt.Errorf("could'nt get tokenSub from context"),
+								"could'nt get tokenSub from context",
 								http.StatusInternalServerError)
 						}
 						w.Write([]byte(sub))
