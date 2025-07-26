@@ -52,7 +52,7 @@ var (
 	ErrPreconditionFailed            = Error{"precondition failed", http.StatusPreconditionFailed}
 	ErrRequestEntityTooLarge         = Error{"request entity too large", http.StatusRequestEntityTooLarge}
 	ErrRequestURITooLong             = Error{"request URI too long", http.StatusRequestURITooLong}
-	ErrUnsuportedMediaType           = Error{"unsupported media type", http.StatusUnsupportedMediaType}
+	ErrUnsupportedMediaType          = Error{"unsupported media type", http.StatusUnsupportedMediaType}
 	ErrRequestedRangeNotSatisfiable  = Error{"requested range unsatisfiable", http.StatusRequestedRangeNotSatisfiable}
 	ErrExpectationFailed             = Error{"expectation failed", http.StatusExpectationFailed}
 	ErrTeapot                        = Error{"i'm a teapot", http.StatusTeapot}
@@ -80,10 +80,6 @@ var (
 )
 
 func ErrFuncDefault(w http.ResponseWriter, r *http.Request, err error) {
-	if err == nil {
-		return
-	}
-
 	sympleErr, statusCode := GetSympleError(err)
 	if sympleErr != nil {
 		http.Error(w, sympleErr.Error(), statusCode)
