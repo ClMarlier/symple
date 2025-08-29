@@ -2,6 +2,7 @@ package symple
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -144,6 +145,34 @@ func TestWithOptionsPatternError(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "malformated handler pattern") {
 		t.Fatalf("should return a malformated error patern, found: %s", err.Error())
+	}
+}
+
+func TestWithSitemap(t *testing.T) {
+	host := "http://localhost:7331"
+	rs := NewRouter(ErrFuncDefault)
+	rs.SetHost(host)
+
+	mux, err := rs.Router(
+		rs.WithSitemap(true),
+		rs.WithRoute("GET /test-1", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+		rs.WithRoute("GET /test-2", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+	)
+	if err != nil {
+		t.Fatal(err.Error())
+	}
+
+	recorder := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/sitemap.xml", nil)
+	mux.ServeHTTP(recorder, req)
+
+	res := recorder.Result()
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !(strings.Contains(string(body), host+"/test-1") && strings.Contains(string(body), host+"/test-2")) {
+		t.Fatal("sitemap does'nt seems to contain the proper informations")
 	}
 }
 

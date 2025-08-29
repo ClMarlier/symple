@@ -7,27 +7,27 @@ import (
 
 type HttpError interface {
 	Error() string
-	StatusCode() int
+	Status() int
 }
 
 type Error struct {
-	message    string
-	statusCode int
+	Message    string
+	StatusCode int
 }
 
 func (e Error) Error() string {
-	return e.message
+	return e.Message
 }
 
-func (e Error) StatusCode() int {
-	return e.statusCode
+func (e Error) Status() int {
+	return e.StatusCode
 }
 
 func GetSympleError(err error) (error, int) {
 	for {
 		sympleError, ok := err.(HttpError)
 		if ok {
-			return sympleError, sympleError.StatusCode()
+			return sympleError, sympleError.Status()
 		}
 		err = errors.Unwrap(err)
 		if err == nil {

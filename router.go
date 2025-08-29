@@ -9,17 +9,23 @@ import (
 )
 
 type routerState struct {
+	host             string
 	sequence         int
-	extra            map[int]routeExtra
+	extraInfo        map[int]routeExtra
 	errorHandlerFunc ErrorHandlerFunc
 }
 
 func NewRouter(handler ErrorHandlerFunc) *routerState {
 	return &routerState{
 		sequence:         0,
-		extra:            make(map[int]routeExtra),
+		extraInfo:        make(map[int]routeExtra),
 		errorHandlerFunc: handler,
 	}
+}
+
+// SetHost provides the host to be used by sitemap.
+func (rs *routerState) SetHost(host string) {
+	rs.host = host
 }
 
 func (rs *routerState) nextSequence() {
@@ -31,12 +37,12 @@ func (rs *routerState) getSequence() int {
 }
 
 func (rs *routerState) getExtra(key int) (routeExtra, bool) {
-	val, ok := rs.extra[key]
+	val, ok := rs.extraInfo[key]
 	return val, ok
 }
 
 func (rs *routerState) setExtra(key int, value routeExtra) {
-	rs.extra[key] = value
+	rs.extraInfo[key] = value
 }
 
 type setBool struct {
@@ -132,9 +138,13 @@ func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
 		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", path), optionHandler(methods))
 	}
 
-	// Add sitemap.xml handler if needed
+	// Add sitemap.xml handler to reference all listed routes
 	if len(sitemap) > 0 {
-		fmt.Println(sitemap)
+		sitemapBytes := generateSitemap(sitemap, rs.host)
+		mux.HandleFunc(fmt.Sprintf("GET /sitemap.xml"), func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", fmt.Sprintf("%s; charset=UTF-8", ContentTypeXml))
+			w.Write(sitemapBytes)
+		})
 	}
 	return mux, nil
 }
@@ -168,14 +178,19 @@ func (rs *routerState) initRouter(opts ...routerOption) (routerBuilder, error) {
 
 	// handle options, sitemap and all route
 	for _, route := range rb.routeStack {
-		ext, ok := rs.getExtra(route.id)
+		extraInfo, ok := rs.getExtra(route.id)
 		if !ok {
 			return routerBuilder{}, fmt.Errorf("couldn't load id %d for route %s", route.id, route.pattern)
 		}
-		if !ext.options.isSet {
-			ext.options = rb.options
-			rs.setExtra(route.id, ext)
+
+		if !extraInfo.options.isSet {
+			extraInfo.options = rb.options
 		}
+		if !extraInfo.sitemap.isSet {
+			extraInfo.sitemap = rb.sitemap
+		}
+
+		rs.setExtra(route.id, extraInfo)
 	}
 
 	return rb, nil
@@ -254,6 +269,17 @@ func optionHandler(methods []string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Accept", strings.Join(methods, ", "))
 	}
+}
+
+func generateSitemap(urls []string, host string) []byte {
+	sitemap := []byte{}
+	sitemap = fmt.Append(sitemap, `<?xml version="1.0" encoding="UTF-8"?><urlset>`)
+	for _, url := range urls {
+		sitemap = fmt.Appendf(sitemap, "<url><loc>%s%s</loc></url>", host, url)
+	}
+	sitemap = fmt.Append(sitemap, "</urlset>")
+
+	return sitemap
 }
 
 func applyPrefix(pattern string, prefix string) string {

@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestRecoverer(t *testing.T) {
+func TestWithRecoverer(t *testing.T) {
 	testTable := []struct {
 		name           string
 		writeError     bool
