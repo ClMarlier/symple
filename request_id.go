@@ -1,6 +1,7 @@
 package symple
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/google/uuid"
@@ -15,11 +16,13 @@ func (rs *routerState) WithRequestId() routerOption {
 
 func requestIdMiddleware(next HandlerFunc) HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) (err error) {
-		rid, err := uuid.NewV6()
+		requestId, err := uuid.NewV6()
 		if err != nil {
 			return err
 		}
-		w.Header().Set("X-Request-Id", rid.String())
+
+		w.Header().Set("X-Request-Id", requestId.String())
+		r = r.WithContext(context.WithValue(r.Context(), "request_id", requestId.String()))
 		return next(w, r)
 	}
 }

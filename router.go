@@ -23,6 +23,11 @@ func NewRouter(handler ErrorHandlerFunc) *routerState {
 	}
 }
 
+// SetHost provides the host to be used by sitemap.
+func (rs *routerState) SetHost(host string) {
+	rs.host = host
+}
+
 func (rs *routerState) nextSequence() {
 	rs.sequence += 1
 }
@@ -253,9 +258,8 @@ func (rs *routerState) WithOptions(active bool) routerOption {
 
 // WithSitemap is adding all the child route to the sitemap. You can reverse this
 // behaviour in SubRouters by setting the active value to false
-func (rs *routerState) WithSitemap(active bool, host string) routerOption {
+func (rs *routerState) WithSitemap(active bool) routerOption {
 	return func(rb *routerBuilder) error {
-		rs.host = host
 		rb.sitemap = setBool{isSet: true, value: active}
 		return nil
 	}

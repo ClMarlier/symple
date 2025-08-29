@@ -151,8 +151,10 @@ func TestWithOptionsPatternError(t *testing.T) {
 func TestWithSitemap(t *testing.T) {
 	host := "http://localhost:7331"
 	rs := NewRouter(ErrFuncDefault)
+	rs.SetHost(host)
+
 	mux, err := rs.Router(
-		rs.WithSitemap(true, host),
+		rs.WithSitemap(true),
 		rs.WithRoute("GET /test-1", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 		rs.WithRoute("GET /test-2", func(w http.ResponseWriter, r *http.Request) error { return nil }),
 	)
@@ -169,7 +171,7 @@ func TestWithSitemap(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(body), host+"/test-1") && strings.Contains(string(body), host+"/test-2") {
+	if !(strings.Contains(string(body), host+"/test-1") && strings.Contains(string(body), host+"/test-2")) {
 		t.Fatal("sitemap does'nt seems to contain the proper informations")
 	}
 }
