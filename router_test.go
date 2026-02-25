@@ -148,31 +148,126 @@ func TestWithOptionsPatternError(t *testing.T) {
 	}
 }
 
+func TestWithHostname(t *testing.T) {
+	testTable := []struct {
+		name        string
+		firstHost   string
+		secondHost  string
+		requestHost string
+		statusCode  int
+	}{
+		{
+			name:        "hostname match",
+			firstHost:   "http://localhost",
+			secondHost:  "http://local",
+			requestHost: "http://localhost",
+			statusCode:  http.StatusOK,
+		},
+		{
+			name:        "hostname match",
+			firstHost:   "http://localhost",
+			secondHost:  "http://local",
+			requestHost: "http://nowhere",
+			statusCode:  http.StatusNotFound,
+		},
+		{
+			name:        "no hostname match",
+			firstHost:   "http://localhost",
+			secondHost:  "", //equivalent to not using WithHostname
+			requestHost: "http://nowhere",
+			statusCode:  http.StatusOK,
+		},
+	}
+	for _, val := range testTable {
+		t.Run(val.name, func(t *testing.T) {
+
+			rs := NewRouter(ErrFuncDefault)
+
+			mux, err := rs.Router(
+				rs.WithRouter(
+					rs.WithHostname(val.firstHost),
+					rs.WithRoute("GET /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+				),
+				rs.WithRouter(
+					rs.WithHostname(val.secondHost),
+					rs.WithRoute("GET /test", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+				),
+			)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/test", nil)
+			req.Header.Add("X-Forwarded-Host", val.requestHost)
+			mux.ServeHTTP(recorder, req)
+
+			res := recorder.Result()
+			if res.StatusCode != val.statusCode {
+				t.Fatalf("unexpected status code, expected %d but got: %d", val.statusCode, res.StatusCode)
+			}
+		})
+	}
+}
 func TestWithSitemap(t *testing.T) {
-	host := "http://localhost:7331"
-	rs := NewRouter(ErrFuncDefault)
-	rs.SetHost(host)
-
-	mux, err := rs.Router(
-		rs.WithSitemap(true),
-		rs.WithRoute("GET /test-1", func(w http.ResponseWriter, r *http.Request) error { return nil }),
-		rs.WithRoute("GET /test-2", func(w http.ResponseWriter, r *http.Request) error { return nil }),
-	)
-	if err != nil {
-		t.Fatal(err.Error())
+	testTable := []struct {
+		name         string
+		declaredHost string
+		hostname     string
+		statusCode   int
+	}{
+		{
+			name:         "sitemap found",
+			declaredHost: "http://localhost:7331",
+			hostname:     "http://localhost:7331",
+			statusCode:   http.StatusOK,
+		},
+		{
+			name:         "sitemap not found (wrong hostname)",
+			declaredHost: "http://localhost:7331",
+			hostname:     "http://localhost:7332",
+			statusCode:   http.StatusNotFound,
+		},
+		{
+			name:         "sitemap no hostname",
+			declaredHost: "",
+			hostname:     "http://localhost:7331",
+			statusCode:   http.StatusOK,
+		},
 	}
+	for _, val := range testTable {
+		t.Run(val.name, func(t *testing.T) {
 
-	recorder := httptest.NewRecorder()
-	req := httptest.NewRequest("GET", "/sitemap.xml", nil)
-	mux.ServeHTTP(recorder, req)
+			rs := NewRouter(ErrFuncDefault)
 
-	res := recorder.Result()
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !(strings.Contains(string(body), host+"/test-1") && strings.Contains(string(body), host+"/test-2")) {
-		t.Fatal("sitemap does'nt seems to contain the proper informations")
+			mux, err := rs.Router(
+				rs.WithHostname(val.declaredHost),
+				rs.WithSitemap(true),
+				rs.WithRoute("GET /test-1", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+				rs.WithRoute("GET /test-2", func(w http.ResponseWriter, r *http.Request) error { return nil }),
+			)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+			recorder := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/sitemap.xml", nil)
+			req.Header.Add("X-Forwarded-Host", val.hostname)
+			mux.ServeHTTP(recorder, req)
+
+			res := recorder.Result()
+			if res.StatusCode != val.statusCode {
+				t.Fatalf("unexpected status code, expected %d but got: %d", val.statusCode, res.StatusCode)
+			}
+			if res.StatusCode == http.StatusOK {
+				body, err := io.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				if !(strings.Contains(string(body), val.declaredHost+"/test-1") && strings.Contains(string(body), val.declaredHost+"/test-2")) {
+					t.Fatalf("sitemap does'nt seems to contain the proper informations : %s", string(body))
+				}
+			}
+		})
 	}
 }
 

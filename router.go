@@ -9,10 +9,65 @@ import (
 )
 
 type routerState struct {
-	host             string
 	sequence         int
 	extraInfo        map[int]routeExtra
 	errorHandlerFunc ErrorHandlerFunc
+}
+
+type handlerFuncWithHost struct {
+	host string
+	fn   HandlerFunc
+}
+
+type preProcessor struct {
+	options       map[string][]string
+	sitemap       []string
+	hostnameRoute map[string][]handlerFuncWithHost
+}
+
+func preProcess(rs *routerState, rd []routeDefinition) (preProcessor, error) {
+	var pp = preProcessor{
+		options:       make(map[string][]string),
+		hostnameRoute: make(map[string][]handlerFuncWithHost),
+	}
+	for _, route := range rd {
+		if val, ok := rs.getExtra(route.id); ok {
+			path, methods, err := parsePattern(route.pattern)
+			if err != nil {
+				return pp, err
+			}
+
+			if val.options.value {
+				var nextMethods []string = []string{}
+				if val, ok := pp.options[path]; ok {
+					nextMethods = val
+				}
+
+				for _, method := range methods {
+					if !slices.Contains(nextMethods, method) {
+						nextMethods = append(nextMethods, method)
+					}
+				}
+				pp.options[path] = nextMethods
+			}
+
+			if val.sitemap.value {
+				if !slices.Contains(pp.sitemap, path) {
+					pp.sitemap = append(pp.sitemap, path)
+				}
+			}
+
+			pp.hostnameRoute[route.pattern] = append(
+				pp.hostnameRoute[route.pattern],
+				handlerFuncWithHost{
+					host: val.hostname,
+					fn:   chainMiddleware(route.handler, route.middlewareStack...),
+				},
+			)
+		}
+
+	}
+	return pp, nil
 }
 
 func NewRouter(handler ErrorHandlerFunc) *routerState {
@@ -21,11 +76,6 @@ func NewRouter(handler ErrorHandlerFunc) *routerState {
 		extraInfo:        make(map[int]routeExtra),
 		errorHandlerFunc: handler,
 	}
-}
-
-// SetHost provides the host to be used by sitemap.
-func (rs *routerState) SetHost(host string) {
-	rs.host = host
 }
 
 func (rs *routerState) nextSequence() {
@@ -51,8 +101,9 @@ type setBool struct {
 }
 
 type routeExtra struct {
-	options setBool
-	sitemap setBool
+	options  setBool
+	sitemap  setBool
+	hostname string
 }
 
 type routerBuilder struct {
@@ -62,6 +113,7 @@ type routerBuilder struct {
 	subRouter       []routerBuilder
 	options         setBool
 	sitemap         setBool
+	hostname        string
 }
 
 type routerOption func(*routerBuilder) error
@@ -100,48 +152,44 @@ func (rs *routerState) Router(opts ...routerOption) (*http.ServeMux, error) {
 	}
 
 	mux := http.NewServeMux()
-	options := make(map[string][]string)
-	sitemap := make([]string, 0)
-	for _, route := range router.routeStack {
-		mux.HandleFunc(route.pattern, rs.MakeHandlerFunc(chainMiddleware(route.handler, route.middlewareStack...)))
-
-		if val, ok := rs.getExtra(route.id); ok {
-			path, methods, err := parsePattern(route.pattern)
-			if err != nil {
-				return nil, err
-			}
-
-			if val.options.value {
-				var nextMethods []string = []string{}
-				if val, ok := options[path]; ok {
-					nextMethods = val
-				}
-
-				for _, method := range methods {
-					if !slices.Contains(nextMethods, method) {
-						nextMethods = append(nextMethods, method)
-					}
-				}
-				options[path] = nextMethods
-			}
-
-			if val.sitemap.value {
-				if !slices.Contains(sitemap, path) {
-					sitemap = append(sitemap, path)
-				}
-			}
+	preProcessed, err := preProcess(rs, router.routeStack)
+	if err != nil {
+		return nil, err
+	}
+	for key, value := range preProcessed.hostnameRoute {
+		if len(value) == 1 && value[0].host == "" {
+			mux.HandleFunc(key, rs.MakeHandlerFunc(value[0].fn))
+		} else {
+			mux.HandleFunc(key, rs.MakeHandlerFunc(hostHandlerBuild(value)))
 		}
 	}
 
 	// Add handler with options methods to all registered routes
-	for path, methods := range options {
+	for path, methods := range preProcessed.options {
 		mux.HandleFunc(fmt.Sprintf("OPTIONS %s", path), optionHandler(methods))
 	}
 
 	// Add sitemap.xml handler to reference all listed routes
-	if len(sitemap) > 0 {
-		sitemapBytes := generateSitemap(sitemap, rs.host)
+	if len(preProcessed.sitemap) > 0 {
+		routePerHost := make(map[string][]string)
+		for _, url := range preProcessed.sitemap {
+			for _, item := range preProcessed.hostnameRoute[fmt.Sprintf("GET %s", url)] {
+				routePerHost[item.host] = append(routePerHost[item.host], url)
+			}
+		}
+		// sitemapBytes := generateSitemap(preProcessed.sitemap, rs.host)
 		mux.HandleFunc(fmt.Sprintf("GET /sitemap.xml"), func(w http.ResponseWriter, r *http.Request) {
+			hostname := getHostname(r)
+			var sitemapBytes []byte
+			if val, ok := routePerHost[hostname]; ok {
+				sitemapBytes = generateSitemap(val, hostname)
+			} else if val, ok := routePerHost[""]; ok {
+				sitemapBytes = generateSitemap(val, "")
+			} else {
+				w.WriteHeader(http.StatusNotFound)
+				w.Write([]byte("Not found"))
+				return
+			}
 			w.Header().Set("Content-Type", fmt.Sprintf("%s; charset=UTF-8", ContentTypeXml))
 			w.Write(sitemapBytes)
 		})
@@ -183,6 +231,9 @@ func (rs *routerState) initRouter(opts ...routerOption) (routerBuilder, error) {
 			return routerBuilder{}, fmt.Errorf("couldn't load id %d for route %s", route.id, route.pattern)
 		}
 
+		if rb.hostname != "" {
+			extraInfo.hostname = rb.hostname
+		}
 		if !extraInfo.options.isSet {
 			extraInfo.options = rb.options
 		}
@@ -242,6 +293,14 @@ func (rs *routerState) WithRoute(pattern string, handler HandlerFunc) routerOpti
 		rs.setExtra(rs.getSequence(), routeExtra{options: setBool{}, sitemap: setBool{}})
 		rs.nextSequence()
 
+		return nil
+	}
+}
+
+// WithHostname is restricting children routes to the provided hostname
+func (rs *routerState) WithHostname(hostname string) routerOption {
+	return func(rb *routerBuilder) error {
+		rb.hostname = hostname
 		return nil
 	}
 }
@@ -317,6 +376,36 @@ func parsePattern(pattern string) (string, []string, error) {
 		return splitted[1], []string{splitted[0]}, nil
 	}
 	return "", []string{}, fmt.Errorf("malformated handler pattern %s", pattern)
+}
+
+func hostHandlerBuild(items []handlerFuncWithHost) HandlerFunc {
+	var noHost HandlerFunc
+	for _, item := range items {
+		if item.host == "" {
+			noHost = item.fn
+		}
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) error {
+		hostname := getHostname(r)
+		for _, item := range items {
+			if item.host == hostname {
+				return item.fn(w, r)
+			}
+		}
+		if noHost != nil {
+			return noHost(w, r)
+		}
+		return ErrNotFound
+	}
+}
+
+func getHostname(r *http.Request) string {
+	var hostname = r.Host
+	if forwarded_host := r.Header.Get("X-Forwarded-Host"); forwarded_host != "" {
+		hostname = forwarded_host
+	}
+	return hostname
 }
 
 func (rs *routerState) Startup() {
